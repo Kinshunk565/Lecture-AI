@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen, Search, Clock, CheckCircle, Mic, Brain, Play } from 'lucide-react';
 import Footer from '../components/layout/Footer';
+import InteractiveHeroDemo from '../components/InteractiveHeroDemo';
 
 const features = [
   { icon: Brain, title: 'Semantic Understanding', desc: 'Find concepts based on meaning, not just keywords. BGE-M3 embeddings capture deep semantic relationships.' },
@@ -52,46 +53,9 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Product Preview */}
-          <div className="max-w-4xl mx-auto">
-            <div className="card p-6 md:p-8 bg-[var(--color-surface)]">
-              <div className="bg-[var(--color-background)] rounded-lg p-5 border border-[var(--color-border)]">
-                {/* Fake search bar */}
-                <div className="flex items-center gap-3 px-4 py-3 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] mb-5">
-                  <Search size={16} className="text-[var(--color-secondary)]" />
-                  <span className="text-sm text-[var(--color-primary)]">What is CSS and how does it work?</span>
-                </div>
-
-                {/* Fake answer */}
-                <div className="mb-5">
-                  <span className="section-title mb-2 block">Answer</span>
-                  <p className="text-sm text-[var(--color-primary)] leading-relaxed">
-                    CSS (Cascading Style Sheets) is responsible for styling web pages. While HTML creates the skeleton/structure of a website, CSS handles the visual presentation — colors, layouts, fonts, and designs. CSS uses selectors to target HTML elements and applies declarations (property-value pairs) to style them.
-                  </p>
-                </div>
-
-                {/* Fake sources */}
-                <span className="section-title mb-3 block">Sources from your lecture</span>
-                <div className="space-y-2">
-                  {[
-                    { time: '0:21', title: 'CSS stands for Cascading Style Sheets' },
-                    { time: '1:31', title: 'HTML vs CSS — skeleton vs styling' },
-                    { time: '4:44', title: 'CSS selectors and declarations explained' },
-                  ].map((s, i) => (
-                    <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]">
-                      <div className="w-8 h-8 rounded-md bg-[var(--color-accent-light)] flex items-center justify-center flex-shrink-0">
-                        <Play size={12} className="text-[var(--color-accent)] ml-0.5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-[var(--color-primary)] truncate">{s.title}</p>
-                        <p className="text-[10px] text-[var(--color-secondary)]">Video 14 · Introduction to CSS</p>
-                      </div>
-                      <span className="text-xs font-mono text-[var(--color-accent)]">{s.time}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          {/* Live Interactive Video & AI Demo */}
+          <div className="mt-6">
+            <InteractiveHeroDemo />
           </div>
         </div>
       </section>
