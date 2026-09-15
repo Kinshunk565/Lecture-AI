@@ -160,6 +160,22 @@ class SearchRequest(BaseModel):
 
 # ─── Endpoints ─────────────────────────────────────────────────
 
+@app.get("/")
+async def root():
+    return {
+        "message": "🎓 Welcome to LectureAI API",
+        "status": "online",
+        "docs": "/docs",
+        "endpoints": {
+            "health": "/api/health",
+            "lectures": "/api/lectures",
+            "ask": "/api/ask",
+            "search": "/api/search",
+            "stats": "/api/stats"
+        }
+    }
+
+
 @app.get("/api/health")
 async def health_check():
     has_api_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
