@@ -80,31 +80,32 @@ export default function CustomCursor() {
         className="pointer-events-none fixed top-0 left-0 z-[9999] rounded-full transition-transform ease-out will-change-transform"
         style={{
           transform: `translate3d(${followerPos.x}px, ${followerPos.y}px, 0) translate(-50%, -50%) scale(${
-            isClicked ? 0.75 : isHovered ? 1.5 : 1
+            isClicked ? 0.75 : isHovered ? 1.6 : 1
           })`,
-          width: '34px',
-          height: '34px',
+          width: '36px',
+          height: '36px',
           border: '1.5px solid var(--color-accent)',
-          backgroundColor: isHovered ? 'rgba(74, 124, 111, 0.12)' : 'rgba(74, 124, 111, 0.05)',
+          backgroundColor: isHovered ? 'rgba(74, 124, 111, 0.16)' : 'rgba(74, 124, 111, 0.04)',
           boxShadow: isHovered
-            ? '0 0 20px rgba(74, 124, 111, 0.4), inset 0 0 10px rgba(74, 124, 111, 0.2)'
-            : '0 0 10px rgba(74, 124, 111, 0.15)',
-          transitionDuration: '180ms',
+            ? '0 0 24px rgba(74, 124, 111, 0.45), inset 0 0 12px rgba(74, 124, 111, 0.25)'
+            : '0 0 12px rgba(74, 124, 111, 0.2)',
+          transitionDuration: '160ms',
         }}
       />
 
-      {/* Inner Precision Dot */}
+      {/* Inner Precision Dot with white border for crisp contrast */}
       <div
         className="pointer-events-none fixed top-0 left-0 z-[9999] rounded-full transition-transform will-change-transform"
         style={{
           transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%) scale(${
-            isClicked ? 1.4 : isHovered ? 0.6 : 1
+            isClicked ? 1.3 : isHovered ? 0.6 : 1
           })`,
-          width: '6px',
-          height: '6px',
+          width: '8px',
+          height: '8px',
           backgroundColor: 'var(--color-accent)',
-          boxShadow: '0 0 8px var(--color-accent)',
-          transitionDuration: '50ms',
+          border: '1.5px solid #ffffff',
+          boxShadow: '0 0 10px rgba(74, 124, 111, 0.7), 0 2px 4px rgba(0,0,0,0.2)',
+          transitionDuration: '40ms',
         }}
       />
     </>
