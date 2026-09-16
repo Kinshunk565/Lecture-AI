@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, MessageSquare, FileText, Clock, Sparkles } from 'lucide-react';
+import { Play, MessageSquare, FileText, Clock, Sparkles, Download, Loader2 } from 'lucide-react';
 import type { Lecture } from '../types';
 import { formatDuration } from '../utils/formatTime';
+import { api } from '../services/api';
+import { generateLecturePdfSummary } from '../utils/generatePdfSummary';
 
 interface LectureCardProps {
   lecture: Lecture;
@@ -31,6 +33,21 @@ const YOUTUBE_LECTURES: Record<string, string> = {
 
 export default function LectureCard({ lecture }: LectureCardProps) {
   const [imgError, setImgError] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPdf = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      setIsDownloading(true);
+      const transcriptData = await api.getTranscript(lecture.number);
+      await generateLecturePdfSummary(lecture, transcriptData.chunks || []);
+    } catch (err) {
+      console.error('Failed to download PDF summary:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const cleanNum = lecture.number ? String(parseInt(lecture.number, 10)) : "1";
   const ytId = YOUTUBE_LECTURES[cleanNum] || "Edsxf_NBFrw";
@@ -120,6 +137,19 @@ export default function LectureCard({ lecture }: LectureCardProps) {
           >
             <MessageSquare size={13} /> Ask AI
           </Link>
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={isDownloading}
+            title="Download AI Summary PDF"
+            className="btn-secondary text-xs px-2.5 py-2 justify-center hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors cursor-pointer"
+          >
+            {isDownloading ? (
+              <Loader2 size={13} className="animate-spin text-[var(--color-accent)]" />
+            ) : (
+              <Download size={13} />
+            )}
+          </button>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { FileText, ChevronLeft } from 'lucide-react';
+import { FileText, ChevronLeft, Download, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import type { Lecture, TranscriptChunk, Source } from '../types';
@@ -11,6 +11,7 @@ import LoadingState from '../components/LoadingState';
 import { useHistory } from '../hooks/useHistory';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { formatDuration } from '../utils/formatTime';
+import { generateLecturePdfSummary } from '../utils/generatePdfSummary';
 
 export default function LectureDetail() {
   const { number } = useParams<{ number: string }>();
@@ -22,6 +23,7 @@ export default function LectureDetail() {
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [highlightedStart, setHighlightedStart] = useState<number | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [activeTab, setActiveTab] = useState<'ai' | 'transcript'>(
     searchParams.get('ask') === 'true' ? 'ai' : 'ai'
   );
@@ -80,6 +82,18 @@ export default function LectureDetail() {
     });
   }, [addBookmark]);
 
+  const handleDownloadPdf = useCallback(async () => {
+    if (!lecture) return;
+    try {
+      setIsDownloadingPdf(true);
+      await generateLecturePdfSummary(lecture, chunks);
+    } catch (err) {
+      console.error('Failed to generate summary PDF:', err);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  }, [lecture, chunks]);
+
   if (loading) return <LoadingState message="Loading lecture..." />;
   if (error || !lecture) {
     return (
@@ -98,26 +112,48 @@ export default function LectureDetail() {
     <div className="animate-fade-in">
       {/* Header */}
       <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="flex items-center gap-3 mb-1">
-          <Link to="/lectures" className="text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors">
-            <ChevronLeft size={18} />
-          </Link>
-          <div>
-            <h1 className="text-lg font-semibold text-[var(--color-primary)] tracking-tight">
-              {lecture.title}
-            </h1>
-            <div className="flex items-center gap-3 text-xs text-[var(--color-secondary)]">
-              <span>Video {lecture.number}</span>
-              <span>·</span>
-              <span className="flex items-center gap-1"><FileText size={11} /> {lecture.chunk_count} segments</span>
-              {lecture.duration > 0 && (
-                <>
-                  <span>·</span>
-                  <span>{formatDuration(lecture.duration)}</span>
-                </>
-              )}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link to="/lectures" className="text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors">
+              <ChevronLeft size={18} />
+            </Link>
+            <div>
+              <h1 className="text-lg font-semibold text-[var(--color-primary)] tracking-tight">
+                {lecture.title}
+              </h1>
+              <div className="flex items-center gap-3 text-xs text-[var(--color-secondary)]">
+                <span>Video {lecture.number}</span>
+                <span>·</span>
+                <span className="flex items-center gap-1"><FileText size={11} /> {lecture.chunk_count} segments</span>
+                {lecture.duration > 0 && (
+                  <>
+                    <span>·</span>
+                    <span>{formatDuration(lecture.duration)}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Download PDF Button */}
+          <button
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
+            className="btn-secondary text-xs font-medium flex items-center justify-center gap-2 self-start sm:self-auto py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
+            title="Download structured AI study summary PDF of this lecture"
+          >
+            {isDownloadingPdf ? (
+              <>
+                <Loader2 size={14} className="animate-spin text-[var(--color-accent)]" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download size={14} className="text-[var(--color-accent)]" />
+                <span>Download Summary PDF</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
