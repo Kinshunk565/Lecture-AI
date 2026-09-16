@@ -24,6 +24,7 @@ warnings.filterwarnings("ignore")
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+logger = logging.getLogger("process_incoming")
 
 # Cached local sentence transformer model
 _st_model = None
@@ -56,14 +57,31 @@ def create_embedding(text_list):
     except requests.exceptions.RequestException:
         pass
 
+    # Try Hugging Face Inference API if HF_TOKEN or HUGGINGFACE_API_KEY is available
+    hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY")
+    if hf_token:
+        try:
+            r = requests.post(
+                "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-m3",
+                headers={"Authorization": f"Bearer {hf_token}"},
+                json={"inputs": text_list, "options": {"wait_for_model": True}},
+                timeout=15
+            )
+            if r.status_code == 200:
+                res = r.json()
+                if isinstance(res, list) and len(res) > 0:
+                    return res
+        except Exception as e:
+            logger.warning(f"HF Inference API embedding failed, falling back to local: {e}")
+
     # Fallback to local SentenceTransformer (bge-m3)
     try:
         model = get_local_embedding_model()
         embeddings = model.encode(text_list, show_progress_bar=False)
         return embeddings.tolist()
     except Exception as e:
-        print(f"\nError generating embedding: {e}")
-        sys.exit(1)
+        logger.error(f"Error generating embedding: {e}")
+        raise RuntimeError(f"Error generating embedding: {e}")
 
 # Helper to load .env or .env.example file if present
 def load_env(env_paths=(".env", ".env.example")):

@@ -2,21 +2,30 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for audio/video processing
+# Prevent Python from writing .pyc and enable unbuffered output
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HUB_DISABLE_SYMLINKS_WARNING=1 \
+    TRANSFORMERS_VERBOSITY=error \
+    TOKENIZERS_PARALLELISM=false
+
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
+# Install lightweight CPU-only PyTorch first (saves 2.2GB compared to default CUDA wheel)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Copy requirements and install remaining dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and data assets
+# Copy application and dataset
 COPY . .
 
-# Expose port
-EXPOSE 8000
+# Expose Render standard port (10000) and local dev port (8000)
+EXPOSE 10000 8000
 
-# Command to run application
-CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start Uvicorn bound to 0.0.0.0 on the dynamic $PORT assigned by Render (default 10000)
+CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}"]
