@@ -140,9 +140,10 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
         ))}
 
         {loading && (
-          <div className="flex items-center gap-2.5 animate-fade-in py-2">
-            <Loader2 size={16} className="text-[var(--color-accent)] animate-spin" />
-            <span className="text-sm text-[var(--color-secondary)]">{loadingPhase}</span>
+          <div className="flex items-center gap-2.5 animate-fade-in py-2 px-3 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] w-fit">
+            <Loader2 size={14} className="text-[var(--color-accent)] animate-spin" />
+            <span className="text-xs text-[var(--color-secondary)] font-medium">{loadingPhase}</span>
+            <span className="inline-block w-1.5 h-3.5 bg-[var(--color-accent)] animate-pulse rounded-full shadow-[0_0_8px_var(--color-accent)] ml-0.5" />
           </div>
         )}
 
@@ -154,15 +155,15 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-[var(--color-border)]">
-        <div className="relative">
+      <div className="px-4 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="relative rounded-lg border border-[var(--color-border)] focus-within:border-[var(--color-accent)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/20 transition-all bg-[var(--color-background)]">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask anything about this lecture..."
-            className="input-field text-sm pr-12 resize-none"
+            className="w-full bg-transparent px-3.5 py-2.5 text-sm pr-12 resize-none focus:outline-none text-[var(--color-primary)] placeholder-[var(--color-secondary)]"
             rows={2}
             disabled={loading}
             aria-label="Ask a question"
@@ -170,11 +171,18 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
           <button
             onClick={() => handleSubmit()}
             disabled={!input.trim() || loading}
-            className="absolute right-2 bottom-2 p-2 rounded-md bg-[var(--color-accent)] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--color-accent-hover)] transition-colors"
+            className="absolute right-2 bottom-2 p-2 rounded-md bg-[var(--color-accent)] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--color-accent-hover)] transition-all transform hover:scale-105 active:scale-95 shadow-sm"
             aria-label="Send question"
           >
             <Send size={14} />
           </button>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-[var(--color-secondary)] mt-1.5 px-1">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            AI Teaching Assistant Online
+          </span>
+          <span className="opacity-60 hidden sm:inline">Press Enter ↵ to send</span>
         </div>
       </div>
     </div>

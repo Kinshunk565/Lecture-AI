@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
+import CustomCursor from './components/CustomCursor';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Lectures from './pages/Lectures';
@@ -17,6 +18,7 @@ function AppLayout() {
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
+      <CustomCursor />
       <Navbar />
       <Sidebar />
       <main className={isLanding ? '' : 'lg:ml-60 pb-20 lg:pb-0'}>
