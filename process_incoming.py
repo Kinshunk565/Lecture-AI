@@ -163,14 +163,31 @@ def gemini_inference(prompt, model=None, retries=3):
             raise RuntimeError(f"Network error connecting to Gemini API: {e}")
 
 
+def lexical_search(query: str, df, top_k: int = 5):
+    """Fast, memory-efficient lexical TF-IDF retrieval fallback when dense embeddings cannot load."""
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    corpus = (df['title'].astype(str) + " " + df['text'].astype(str)).tolist()
+    vec = TfidfVectorizer(ngram_range=(1, 2), stop_words='english', max_features=8000)
+    tfidf_matrix = vec.fit_transform(corpus)
+    query_vec = vec.transform([query])
+    sims = cosine_similarity(tfidf_matrix, query_vec).flatten()
+    max_indx = sims.argsort()[::-1][0:top_k]
+    scores = sims[max_indx]
+    return df.iloc[max_indx], scores
+
+
 def rag_query(question, df, top_k=5):
     """Core RAG query function: embed question, find similar chunks, call Gemini.
-    Returns (answer_text, sources_list)."""
-    question_embedding = create_embedding([question])[0]
-    similarities = cosine_similarity(np.vstack(df['embedding']), [question_embedding]).flatten()
-    max_indx = similarities.argsort()[::-1][0:top_k]
-    scores = similarities[max_indx]
-    result_df = df.loc[max_indx]
+    Falls back gracefully to lexical search if local embeddings cannot load due to memory."""
+    try:
+        question_embedding = create_embedding([question])[0]
+        similarities = cosine_similarity(np.vstack(df['embedding']), [question_embedding]).flatten()
+        max_indx = similarities.argsort()[::-1][0:top_k]
+        scores = similarities[max_indx]
+        result_df = df.iloc[max_indx]
+    except Exception as e:
+        logger.warning(f"Dense embedding search failed ({e}); falling back to fast lexical search.")
+        result_df, scores = lexical_search(question, df, top_k=top_k)
 
     prompt = f'''I am teaching web development in my Sigma web development course. Here are video subtitle chunks containing video title, video number, start time in seconds, end time in seconds, the text at that time:
 

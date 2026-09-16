@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("lectureai")
 
 # Import RAG functions from existing codebase
-from process_incoming import create_embedding, gemini_inference, load_env, rag_query
+from process_incoming import create_embedding, gemini_inference, load_env, rag_query, lexical_search
 
 import joblib
 import numpy as np
@@ -258,40 +258,40 @@ async def ask_question(req: AskRequest):
 
 @app.post("/api/search")
 async def search_lectures(req: SearchRequest):
-    """Semantic search across all lectures — returns relevant chunks without Gemini answer."""
+    """Semantic or fast lexical search across all lectures — returns relevant chunks with timestamps."""
     if embeddings_df is None:
         raise HTTPException(status_code=503, detail="Embeddings not loaded.")
 
     if not req.query.strip():
-        raise HTTPException(status_code=400, detail="Search query cannot be empty.")
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
+    top_k = min(req.top_k or 10, 20)
 
     try:
+        # Try dense vector embedding search first
         query_embedding = create_embedding([req.query])[0]
         similarities = cosine_similarity(
             np.vstack(embeddings_df['embedding']), [query_embedding]
         ).flatten()
-
-        top_k = min(req.top_k or 10, 20)
         max_indx = similarities.argsort()[::-1][0:top_k]
         scores = similarities[max_indx]
-
-        results = []
-        for i, idx in enumerate(max_indx):
-            row = embeddings_df.iloc[idx] if idx < len(embeddings_df) else embeddings_df.loc[idx]
-            results.append({
-                "title": row["title"],
-                "number": str(row["number"]),
-                "start": float(row["start"]),
-                "end": float(row["end"]),
-                "text": row["text"],
-                "similarity": float(scores[i]),
-            })
-
-        return {"results": results, "query": req.query}
-
+        result_df = embeddings_df.iloc[max_indx]
     except Exception as e:
-        logger.error(f"Error during search: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An error occurred during search.")
+        logger.warning(f"Dense vector search failed ({e}); falling back to fast lexical TF-IDF search.")
+        result_df, scores = lexical_search(req.query, embeddings_df, top_k=top_k)
+
+    results = []
+    for i, (_, row) in enumerate(result_df.iterrows()):
+        results.append({
+            "title": row["title"],
+            "number": str(row["number"]),
+            "start": float(row["start"]),
+            "end": float(row["end"]),
+            "text": row["text"],
+            "similarity": float(scores[i]) if i < len(scores) else 0.5,
+        })
+
+    return {"results": results, "query": req.query}
 
 
 @app.get("/api/stats")

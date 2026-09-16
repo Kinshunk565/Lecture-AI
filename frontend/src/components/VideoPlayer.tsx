@@ -7,9 +7,31 @@ interface VideoPlayerProps {
   onTimeUpdate?: (currentTime: number) => void;
   seekTo?: number | null;
   lectureTitle?: string;
+  lectureNumber?: string;
 }
 
-export default function VideoPlayer({ src, onTimeUpdate, seekTo, lectureTitle }: VideoPlayerProps) {
+const YOUTUBE_LECTURES: Record<string, string> = {
+  "1": "tVzUXW6siu0",
+  "2": "kJEsTjH5mVg",
+  "3": "BGeDBfCIqas",
+  "4": "nXba2-mgn1k",
+  "5": "1BsVhumGlNc",
+  "6": "CyGodpqfid4",
+  "7": "kUMe1FH4CHE",
+  "8": "vnnlU_PtGLU",
+  "9": "g_rVclTjxxo",
+  "10": "c_hpkJ0p4HQ",
+  "11": "pnakOQv1b3M",
+  "12": "FhPflb_548Y",
+  "13": "bWPMssw54pY",
+  "14": "Edsxf_NBFrw",
+  "15": "1Pfsmw8gB7g",
+  "16": "yebld_T_cOA",
+  "17": "5bId3mykW_4",
+  "18": "hGz_15h7v1Q",
+};
+
+export default function VideoPlayer({ src, onTimeUpdate, seekTo, lectureTitle, lectureNumber }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -75,14 +97,38 @@ export default function VideoPlayer({ src, onTimeUpdate, seekTo, lectureTitle }:
     if (videoRef.current) videoRef.current.playbackRate = next;
   }, [playbackRate]);
 
+  // If no local MP4 file on server, seamlessly stream the actual course video via YouTube!
   if (!src) {
+    const cleanNum = lectureNumber ? String(parseInt(lectureNumber, 10)) : "14";
+    const ytId = YOUTUBE_LECTURES[cleanNum] || "Edsxf_NBFrw";
+    const startTime = Math.floor(seekTo || 0);
+
     return (
-      <div className="w-full aspect-video bg-[var(--color-background)] border border-[var(--color-border)] rounded-lg flex flex-col items-center justify-center">
-        <Play size={32} className="text-[var(--color-secondary)] opacity-40 mb-3" />
-        <p className="text-sm font-medium text-[var(--color-secondary)]">No video available</p>
-        <p className="text-xs text-[var(--color-secondary)] opacity-60 mt-1">
-          Place video files in the videos/ directory
-        </p>
+      <div className="w-full rounded-lg overflow-hidden bg-black relative group shadow-md border border-[var(--color-border)]">
+        {lectureTitle && (
+          <div className="absolute top-0 left-0 right-0 z-10 p-3 bg-gradient-to-b from-black/80 to-transparent text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity truncate">
+            {lectureTitle}
+          </div>
+        )}
+        <div className="w-full aspect-video bg-black">
+          <iframe
+            key={`${ytId}-${startTime}`}
+            src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${startTime}&autoplay=${startTime > 0 ? 1 : 0}&enablejsapi=1&rel=0`}
+            title={lectureTitle || "Lecture Video"}
+            className="w-full h-full border-0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        <div className="px-3.5 py-2 bg-zinc-950 border-t border-zinc-800 text-xs text-zinc-400 flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-emerald-400 font-medium text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Live YouTube Stream · Synced with Transcripts
+          </span>
+          <span className="text-[11px] font-mono text-zinc-300">
+            {startTime > 0 ? `Seeking: ${formatTime(startTime)}` : 'Ready to play'}
+          </span>
+        </div>
       </div>
     );
   }

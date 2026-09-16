@@ -1,7 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, LayoutDashboard, Library, Search, Clock, BarChart3, Settings, Bookmark } from 'lucide-react';
+import { NavLink, useLocation, Link } from 'react-router-dom';
+import { Home, BookOpen, LayoutDashboard, Library, Search, Clock, BarChart3, Settings, Bookmark } from 'lucide-react';
 
 const navItems = [
+  { to: '/', icon: Home, label: 'Home' },
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/lectures', icon: Library, label: 'Lectures' },
   { to: '/search', icon: Search, label: 'Search' },
@@ -20,12 +21,12 @@ export default function Sidebar() {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-60 h-screen fixed left-0 top-0 bg-[var(--color-surface)] border-r border-[var(--color-border)] z-40">
-        <div className="h-16 px-5 flex items-center gap-2.5 border-b border-[var(--color-border)]">
-          <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)] flex items-center justify-center">
+        <Link to="/" className="h-16 px-5 flex items-center gap-2.5 border-b border-[var(--color-border)] no-underline hover:opacity-85 transition-opacity">
+          <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)] flex items-center justify-center shadow-sm">
             <BookOpen size={16} className="text-white" />
           </div>
           <span className="text-lg font-semibold tracking-tight text-[var(--color-primary)]">LectureAI</span>
-        </div>
+        </Link>
 
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
           <span className="section-title px-3 mb-2">Navigation</span>

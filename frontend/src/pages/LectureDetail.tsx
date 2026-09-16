@@ -131,6 +131,7 @@ export default function LectureDetail() {
               onTimeUpdate={handleTimeUpdate}
               seekTo={seekTo}
               lectureTitle={lecture.title}
+              lectureNumber={lecture.number}
             />
           </div>
 
