@@ -125,12 +125,19 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, top_k: topK }),
-      }, 12000);
-      return await handleResponse<SearchResponse>(res);
+      }, 10000);
+      const data = await handleResponse<SearchResponse>(res);
+      if (data && data.results && data.results.length > 0) {
+        return data;
+      }
     } catch {
-      // Fallback search over curriculum
-      return { results: [], query };
+      // Fall through to local curriculum search
     }
+
+    // Instant local curriculum search fallback
+    const { searchCurriculum } = await import('../utils/localSearch');
+    const results = searchCurriculum(query, topK);
+    return { results, query };
   },
 
   // Stats

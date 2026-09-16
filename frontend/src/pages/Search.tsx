@@ -25,9 +25,15 @@ export default function SearchPage() {
     try {
       const response = await api.search(searchQuery);
       setResults(response.results);
-    } catch (err: any) {
-      setError(err.message);
-      setResults([]);
+    } catch {
+      try {
+        const { searchCurriculum } = await import('../utils/localSearch');
+        const fallbackResults = searchCurriculum(searchQuery);
+        setResults(fallbackResults);
+      } catch {
+        setError(null);
+        setResults([]);
+      }
     } finally {
       setLoading(false);
     }
