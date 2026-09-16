@@ -1,27 +1,27 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type { Lecture } from '../types';
+import { FALLBACK_LECTURES } from '../data/fallbackLectures';
 import LectureCard from '../components/LectureCard';
-import LoadingState from '../components/LoadingState';
 import { Search } from 'lucide-react';
 
 export default function Lectures() {
-  const [lectures, setLectures] = useState<Lecture[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [lectures, setLectures] = useState<Lecture[]>(FALLBACK_LECTURES);
   const [filter, setFilter] = useState('');
 
   useEffect(() => {
     api.getLectures()
-      .then(res => setLectures(res.lectures))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then(res => {
+        if (res.lectures && res.lectures.length > 0) {
+          setLectures(res.lectures);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const filtered = filter
     ? lectures.filter(l => l.title.toLowerCase().includes(filter.toLowerCase()))
     : lectures;
-
-  if (loading) return <LoadingState message="Loading lectures..." />;
 
   return (
     <div className="p-6 md:p-8 max-w-5xl animate-fade-in">

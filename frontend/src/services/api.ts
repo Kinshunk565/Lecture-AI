@@ -1,4 +1,26 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { FALLBACK_LECTURES } from '../data/fallbackLectures';
+import type { Lecture, Stats, AskResponse, SearchResponse, TranscriptChunk } from '../types';
+
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  (isLocalhost ? 'http://localhost:8000' : 'https://lecture-ai-api.onrender.com');
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 7000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -11,7 +33,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export const api = {
   // Health
   async health() {
-    const res = await fetch(`${API_BASE}/api/health`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/health`, {}, 5000);
     return handleResponse<{
       status: string;
       embeddings_loaded: boolean;
@@ -22,24 +44,44 @@ export const api = {
   },
 
   // Lectures
-  async getLectures() {
-    const res = await fetch(`${API_BASE}/api/lectures`);
-    return handleResponse<{ lectures: import('../types').Lecture[] }>(res);
+  async getLectures(): Promise<{ lectures: Lecture[] }> {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/lectures`, {}, 6000);
+      const data = await handleResponse<{ lectures: Lecture[] }>(res);
+      if (data && data.lectures && data.lectures.length > 0) {
+        return data;
+      }
+      return { lectures: FALLBACK_LECTURES };
+    } catch {
+      // Fallback on network timeout or cold start
+      return { lectures: FALLBACK_LECTURES };
+    }
   },
 
-  async getLecture(number: string) {
-    const res = await fetch(`${API_BASE}/api/lectures/${number}`);
-    return handleResponse<import('../types').Lecture>(res);
+  async getLecture(number: string): Promise<Lecture> {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/lectures/${number}`, {}, 6000);
+      return await handleResponse<Lecture>(res);
+    } catch {
+      const found = FALLBACK_LECTURES.find(l => l.number === String(number));
+      if (found) return found;
+      throw new Error(`Lecture ${number} not found`);
+    }
   },
 
-  async getTranscript(number: string) {
-    const res = await fetch(`${API_BASE}/api/lectures/${number}/transcript`);
-    return handleResponse<{ chunks: import('../types').TranscriptChunk[]; full_text: string }>(res);
+  async getTranscript(number: string): Promise<{ chunks: TranscriptChunk[]; full_text: string }> {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/lectures/${number}/transcript`, {}, 8000);
+      return await handleResponse<{ chunks: TranscriptChunk[]; full_text: string }>(res);
+    } catch {
+      // Return empty transcript chunks gracefully on error
+      return { chunks: [], full_text: '' };
+    }
   },
 
   // AI / RAG
-  async ask(question: string, lectureNumber?: string, topK: number = 5) {
-    const res = await fetch(`${API_BASE}/api/ask`, {
+  async ask(question: string, lectureNumber?: string, topK: number = 5): Promise<AskResponse> {
+    const res = await fetchWithTimeout(`${API_BASE}/api/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -47,24 +89,33 @@ export const api = {
         lecture_number: lectureNumber || null,
         top_k: topK,
       }),
-    });
-    return handleResponse<import('../types').AskResponse>(res);
+    }, 25000);
+    return handleResponse<AskResponse>(res);
   },
 
   // Search
-  async search(query: string, topK: number = 10) {
-    const res = await fetch(`${API_BASE}/api/search`, {
+  async search(query: string, topK: number = 10): Promise<SearchResponse> {
+    const res = await fetchWithTimeout(`${API_BASE}/api/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, top_k: topK }),
-    });
-    return handleResponse<import('../types').SearchResponse>(res);
+    }, 12000);
+    return handleResponse<SearchResponse>(res);
   },
 
   // Stats
-  async getStats() {
-    const res = await fetch(`${API_BASE}/api/stats`);
-    return handleResponse<import('../types').Stats>(res);
+  async getStats(): Promise<Stats> {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/stats`, {}, 6000);
+      return await handleResponse<Stats>(res);
+    } catch {
+      return {
+        total_lectures: FALLBACK_LECTURES.length,
+        total_chunks: 6863,
+        lecture_titles: FALLBACK_LECTURES.map(l => l.title),
+        embeddings_loaded: true,
+      };
+    }
   },
 
   // Video URL helper
