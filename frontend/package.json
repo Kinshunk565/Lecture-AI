@@ -1,7 +1,12 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "homepage": "https://lecture-ai-seven-beta.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kinshunk565/Lecture-AI"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

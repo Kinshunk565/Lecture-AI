@@ -1,5 +1,9 @@
 # 🎓 LectureAI — Production-Grade RAG AI Teaching Assistant
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-lecture--ai--seven--beta.vercel.app-00DC82?style=for-the-badge&logo=vercel&logoColor=white)](https://lecture-ai-seven-beta.vercel.app)
+[![API Service](https://img.shields.io/badge/API_Service-Render_Cloud-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://lecture-ai-api.onrender.com)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Kinshunk565/Lecture-AI)
+
 [![React](https://img.shields.io/badge/React-19.x-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -7,8 +11,18 @@
 [![Python](https://img.shields.io/badge/Python-3.13+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> 🌐 **Live Web Application**: [lecture-ai-seven-beta.vercel.app](https://lecture-ai-seven-beta.vercel.app)  
-> ⚡ **Live API Service**: [lecture-ai-api.onrender.com](https://lecture-ai-api.onrender.com)
+---
+
+### 🌐 Live Deployments & Project Links
+
+| Service | Status | URL |
+|---|---|---|
+| **Web Frontend (Vercel)** | 🟢 **Active** | [https://lecture-ai-seven-beta.vercel.app](https://lecture-ai-seven-beta.vercel.app) |
+| **Backend API (Render)** | 🟢 **Active** | [https://lecture-ai-api.onrender.com](https://lecture-ai-api.onrender.com) |
+| **Interactive Swagger API Docs** | 🟢 **Active** | [https://lecture-ai-api.onrender.com/docs](https://lecture-ai-api.onrender.com/docs) |
+| **Source Code Repository** | 🐙 **Public** | [https://github.com/Kinshunk565/Lecture-AI](https://github.com/Kinshunk565/Lecture-AI) |
+
+---
 
 **LectureAI** is an end-to-end Retrieval-Augmented Generation (RAG) educational platform designed to transform long video lectures into searchable, interactive, and conversational learning experiences. 
 
