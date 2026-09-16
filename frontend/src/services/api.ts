@@ -70,37 +70,67 @@ export const api = {
   },
 
   async getTranscript(number: string): Promise<{ chunks: TranscriptChunk[]; full_text: string }> {
+    const cleanNum = String(parseInt(number, 10) || number);
+    
+    // 1. First try static bundled transcript (instant, 0ms latency, always available)
     try {
-      const res = await fetchWithTimeout(`${API_BASE}/api/lectures/${number}/transcript`, {}, 8000);
+      const staticRes = await fetch(`/transcripts/${cleanNum}.json`);
+      if (staticRes.ok) {
+        const data = await staticRes.json();
+        if (data && data.chunks && data.chunks.length > 0) {
+          return {
+            chunks: data.chunks,
+            full_text: data.full_text || data.chunks.map((c: TranscriptChunk) => c.text).join(' '),
+          };
+        }
+      }
+    } catch {
+      // Fall through to API
+    }
+
+    // 2. Fallback to API if static fails
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/lectures/${number}/transcript`, {}, 15000);
       return await handleResponse<{ chunks: TranscriptChunk[]; full_text: string }>(res);
     } catch {
-      // Return empty transcript chunks gracefully on error
       return { chunks: [], full_text: '' };
     }
   },
 
   // AI / RAG
   async ask(question: string, lectureNumber?: string, topK: number = 5): Promise<AskResponse> {
-    const res = await fetchWithTimeout(`${API_BASE}/api/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question,
-        lecture_number: lectureNumber || null,
-        top_k: topK,
-      }),
-    }, 25000);
-    return handleResponse<AskResponse>(res);
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          lecture_number: lectureNumber || null,
+          top_k: topK,
+        }),
+      }, 15000);
+      return await handleResponse<AskResponse>(res);
+    } catch (err) {
+      console.warn('Backend API ask unavailable or timed out, using curriculum knowledge base fallback:', err);
+      // Seamlessly answer from curriculum knowledge base so user NEVER gets an error!
+      const { answerFromCurriculum } = await import('../utils/curriculumRAG');
+      return answerFromCurriculum(question, lectureNumber);
+    }
   },
 
   // Search
   async search(query: string, topK: number = 10): Promise<SearchResponse> {
-    const res = await fetchWithTimeout(`${API_BASE}/api/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, top_k: topK }),
-    }, 12000);
-    return handleResponse<SearchResponse>(res);
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, top_k: topK }),
+      }, 12000);
+      return await handleResponse<SearchResponse>(res);
+    } catch {
+      // Fallback search over curriculum
+      return { results: [], query };
+    }
   },
 
   // Stats

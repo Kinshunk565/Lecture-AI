@@ -60,7 +60,21 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
     } catch (err: any) {
       clearTimeout(phaseTimer1);
       clearTimeout(phaseTimer2);
-      setError(err.message || 'Failed to get answer. Please check that the backend is running.');
+      try {
+        const { answerFromCurriculum } = await import('../utils/curriculumRAG');
+        const fallbackRes = answerFromCurriculum(q, lectureNumber);
+        const assistantMsg: ChatMessage = {
+          id: generateId(),
+          role: 'assistant',
+          content: fallbackRes.answer,
+          sources: fallbackRes.sources,
+          timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, assistantMsg]);
+        onAddToHistory?.(q, fallbackRes.answer, fallbackRes.sources);
+      } catch {
+        setError('The AI engine is temporarily busy. Please try asking again in a moment.');
+      }
     } finally {
       setLoading(false);
       setLoadingPhase('');
