@@ -7,18 +7,23 @@
 [![Python](https://img.shields.io/badge/Python-3.13+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> 🌐 **Live Web Application**: [lecture-ai-seven-beta.vercel.app](https://lecture-ai-seven-beta.vercel.app)  
+> ⚡ **Live API Service**: [lecture-ai-api.onrender.com](https://lecture-ai-api.onrender.com)
+
 **LectureAI** is an end-to-end Retrieval-Augmented Generation (RAG) educational platform designed to transform long video lectures into searchable, interactive, and conversational learning experiences. 
 
-Instead of scrubbing through hours of video, students can ask natural-language questions, receive grounded explanations with direct timestamp citations, and jump straight to the exact moments where concepts are explained.
+Instead of scrubbing through hours of video, students can ask natural-language questions, receive grounded explanations with direct timestamp citations, download AI-summarized PDF study notes, and jump straight to the exact moments where concepts are explained.
 
 ---
 
 ## 🌟 Key Features
 
 - 🎯 **Grounded AI Teaching Assistant**: Answers student queries strictly grounded in lecture transcripts using Google Gemini with direct timestamp citations to prevent hallucinations.
-- ⚡ **Timestamp-Synchronized Video Player**: Custom HTML5 media player featuring variable playback speeds, seek jumps, fullscreen, and video overlay synced to transcript timestamps.
+- 📑 **Automated Lecture PDF Summaries**: One-click generation and instant download of structured, beautifully branded A4 study guides containing executive summaries, core objectives, chronological milestones with timestamp pills, and review quiz questions.
+- ⚡ **Timestamp-Synchronized Video Player**: Custom HTML5 media player featuring variable playback speeds, seek jumps, fullscreen, cloud YouTube streaming fallback, and video overlay synced to transcript timestamps.
 - 🔍 **Interactive Semantic Search**: Global search powered by dense vector embeddings (`BAAI/bge-m3`) to find concepts by conceptual meaning, not just exact keywords.
 - 📜 **Synchronized Transcript Viewer**: Live autoscrolling transcript with active-segment highlighting and instant one-click jump-to-time.
+- ✨ **Fluid Animated Custom Cursor**: Responsive, glowing cursor providing micro-interactions and smooth trailing animation across the application.
 - 📊 **Analytics & Metrics Dashboard**: System architecture inspector, corpus statistics, chunk distribution, and retrieval diagnostics.
 - 🔖 **Bookmarks & History**: Save important queries, revisit past interactions, and export notes locally.
 - 🎨 **Modern Dark-Mode Design**: Responsive layout with Tailwind CSS typography, micro-interactions, accessible UI components, and keyboard navigation.
@@ -79,13 +84,13 @@ Lecture-AI/
 │   └── Synopsis_RAG_Teaching_Assistant.docx
 └── frontend/                 # Production React + TypeScript SPA
     ├── src/
-    │   ├── components/       # VideoPlayer, AIChat, TranscriptViewer, SourceCard
+    │   ├── components/       # VideoPlayer, AIChat, TranscriptViewer, SourceCard, CustomCursor
     │   │   └── layout/       # Sidebar, Navbar, Footer
     │   ├── pages/            # Landing, Dashboard, LectureDetail, Search, Analytics, etc.
     │   ├── services/api.ts   # Typed API client
     │   ├── hooks/            # Custom state & storage hooks
     │   ├── types/            # TypeScript data contracts
-    │   └── utils/            # Timestamp formatters & helpers
+    │   └── utils/            # formatTime, generatePdfSummary (jsPDF study guides)
     ├── package.json
     ├── vite.config.ts
     └── tailwind.config.js
@@ -172,7 +177,7 @@ Lecture-AI/
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Lucide Icons, React Router v7
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Lucide Icons, React Router v7, jsPDF (client-side PDF generation)
 - **Backend**: FastAPI, Uvicorn, Pydantic, Starlette
 - **Machine Learning & NLP**:
   - `BAAI/bge-m3` (Dense multilingual embeddings)
