@@ -45,6 +45,25 @@ def get_local_embedding_model():
             _st_model = SentenceTransformer('BAAI/bge-m3')
     return _st_model
 
+def is_low_memory_env() -> bool:
+    """Check if running in a memory-constrained container like Render Free tier (<1.5GB RAM)."""
+    if os.environ.get("USE_LEXICAL_SEARCH", "").lower() in ("1", "true", "yes"):
+        return True
+    if os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY"):
+        return False
+    for limit_file in ("/sys/fs/cgroup/memory/memory.limit_in_bytes", "/sys/fs/cgroup/memory.max"):
+        if os.path.exists(limit_file):
+            try:
+                with open(limit_file, "r") as f:
+                    content = f.read().strip()
+                    if content and content != "max":
+                        if int(content) < 1.8 * 1024 * 1024 * 1024:
+                            return True
+            except Exception:
+                pass
+    return False
+
+
 def create_embedding(text_list):
     # Try Ollama service first if running
     try:
@@ -62,7 +81,7 @@ def create_embedding(text_list):
     if hf_token:
         try:
             r = requests.post(
-                "https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-m3",
+                "https://router.huggingface.co/hf-inference/models/BAAI/bge-m3",
                 headers={"Authorization": f"Bearer {hf_token}"},
                 json={"inputs": text_list, "options": {"wait_for_model": True}},
                 timeout=15
@@ -73,6 +92,10 @@ def create_embedding(text_list):
                     return res
         except Exception as e:
             logger.warning(f"HF Inference API embedding failed, falling back to local: {e}")
+
+    # Guard: On low-memory cloud hosts (like Render Free 512MB), prevent downloading 2.2GB model
+    if is_low_memory_env():
+        raise MemoryError("Low-memory environment detected. Using fast lexical search fallback.")
 
     # Fallback to local SentenceTransformer (bge-m3)
     try:

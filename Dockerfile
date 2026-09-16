@@ -7,7 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HUB_DISABLE_SYMLINKS_WARNING=1 \
     TRANSFORMERS_VERBOSITY=error \
-    TOKENIZERS_PARALLELISM=false
+    TOKENIZERS_PARALLELISM=false \
+    USE_LEXICAL_SEARCH=1
 
 # Install minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,7 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Expose Render standard port (10000) and local dev port (8000)
-EXPOSE 10000 8000
+EXPOSE 8000 10000
 
-# Start Uvicorn bound to 0.0.0.0 on the dynamic $PORT assigned by Render (default 10000)
-CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}"]
+# Start Uvicorn bound to 0.0.0.0 on ${PORT:-8000}
+CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]
