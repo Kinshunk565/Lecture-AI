@@ -1,4 +1,5 @@
 import { FALLBACK_LECTURES } from '../data/fallbackLectures';
+import { customLectureStorage } from './customLectureStorage';
 import type { Lecture, Stats, AskResponse, SearchResponse, TranscriptChunk } from '../types';
 
 const isLocalhost =
@@ -45,24 +46,33 @@ export const api = {
 
   // Lectures
   async getLectures(): Promise<{ lectures: Lecture[] }> {
+    const customList = customLectureStorage.getCustomLectures().map((c) => customLectureStorage.toLecture(c));
     try {
       const res = await fetchWithTimeout(`${API_BASE}/api/lectures`, {}, 6000);
       const data = await handleResponse<{ lectures: Lecture[] }>(res);
       if (data && data.lectures && data.lectures.length > 0) {
-        return data;
+        return { lectures: [...customList, ...data.lectures] };
       }
-      return { lectures: FALLBACK_LECTURES };
+      return { lectures: [...customList, ...FALLBACK_LECTURES] };
     } catch {
       // Fallback on network timeout or cold start
-      return { lectures: FALLBACK_LECTURES };
+      return { lectures: [...customList, ...FALLBACK_LECTURES] };
     }
   },
 
   async getLecture(number: string): Promise<Lecture> {
+    if (number.startsWith('custom-')) {
+      const custom = customLectureStorage.getCustomLecture(number);
+      if (custom) return customLectureStorage.toLecture(custom);
+    }
+
     try {
       const res = await fetchWithTimeout(`${API_BASE}/api/lectures/${number}`, {}, 6000);
       return await handleResponse<Lecture>(res);
     } catch {
+      const custom = customLectureStorage.getCustomLecture(number);
+      if (custom) return customLectureStorage.toLecture(custom);
+
       const found = FALLBACK_LECTURES.find(l => l.number === String(number));
       if (found) return found;
       throw new Error(`Lecture ${number} not found`);
@@ -70,6 +80,16 @@ export const api = {
   },
 
   async getTranscript(number: string): Promise<{ chunks: TranscriptChunk[]; full_text: string }> {
+    if (number.startsWith('custom-')) {
+      const custom = customLectureStorage.getCustomLecture(number);
+      if (custom) {
+        return {
+          chunks: custom.chunks,
+          full_text: custom.chunks.map((c) => c.text).join(' '),
+        };
+      }
+    }
+
     const cleanNum = String(parseInt(number, 10) || number);
     
     // 1. First try static bundled transcript (instant, 0ms latency, always available)
@@ -93,6 +113,13 @@ export const api = {
       const res = await fetchWithTimeout(`${API_BASE}/api/lectures/${number}/transcript`, {}, 15000);
       return await handleResponse<{ chunks: TranscriptChunk[]; full_text: string }>(res);
     } catch {
+      const custom = customLectureStorage.getCustomLecture(number);
+      if (custom) {
+        return {
+          chunks: custom.chunks,
+          full_text: custom.chunks.map((c) => c.text).join(' '),
+        };
+      }
       return { chunks: [], full_text: '' };
     }
   },

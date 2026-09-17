@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward } from 'lucide-react';
 import { formatTime } from '../utils/formatTime';
+import { customLectureStorage } from '../services/customLectureStorage';
 
 interface VideoPlayerProps {
   src: string | null;
@@ -97,10 +98,25 @@ export default function VideoPlayer({ src, onTimeUpdate, seekTo, lectureTitle, l
     if (videoRef.current) videoRef.current.playbackRate = next;
   }, [playbackRate]);
 
-  // If no local MP4 file on server, seamlessly stream the actual course video via YouTube!
-  if (!src) {
+  // Check if custom lecture
+  let effectiveSrc = src;
+  let customYtId: string | undefined;
+
+  if (lectureNumber && lectureNumber.startsWith('custom-')) {
+    const custom = customLectureStorage.getCustomLecture(lectureNumber);
+    if (custom) {
+      if (custom.youtubeId) {
+        customYtId = custom.youtubeId;
+      } else if (custom.videoUrl) {
+        effectiveSrc = custom.videoUrl;
+      }
+    }
+  }
+
+  // If no local MP4 file on server or if it's a YouTube video, stream via YouTube!
+  if (!effectiveSrc || customYtId) {
     const cleanNum = lectureNumber ? String(parseInt(lectureNumber, 10)) : "14";
-    const ytId = YOUTUBE_LECTURES[cleanNum] || "Edsxf_NBFrw";
+    const ytId = customYtId || YOUTUBE_LECTURES[cleanNum] || "Edsxf_NBFrw";
     const startTime = Math.floor(seekTo || 0);
 
     return (
@@ -123,7 +139,7 @@ export default function VideoPlayer({ src, onTimeUpdate, seekTo, lectureTitle, l
         <div className="px-3.5 py-2 bg-zinc-950 border-t border-zinc-800 text-xs text-zinc-400 flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-emerald-400 font-medium text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live YouTube Stream · Synced with Transcripts
+            {customYtId ? 'Custom YouTube Stream · Synced with Transcripts' : 'Live YouTube Stream · Synced with Transcripts'}
           </span>
           <span className="text-[11px] font-mono text-zinc-300">
             {startTime > 0 ? `Seeking: ${formatTime(startTime)}` : 'Ready to play'}
@@ -142,7 +158,7 @@ export default function VideoPlayer({ src, onTimeUpdate, seekTo, lectureTitle, l
       )}
       <video
         ref={videoRef}
-        src={src}
+        src={effectiveSrc || undefined}
         className="w-full aspect-video"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}

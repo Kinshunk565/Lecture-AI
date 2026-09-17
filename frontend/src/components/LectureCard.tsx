@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, MessageSquare, FileText, Clock, Sparkles, Download, Loader2 } from 'lucide-react';
+import { Play, MessageSquare, FileText, Clock, Sparkles, Download, Loader2, Video } from 'lucide-react';
 import type { Lecture } from '../types';
 import { formatDuration } from '../utils/formatTime';
 import { api } from '../services/api';
 import { generateLecturePdfSummary } from '../utils/generatePdfSummary';
+import { customLectureStorage } from '../services/customLectureStorage';
 
 interface LectureCardProps {
   lecture: Lecture;
@@ -49,9 +50,12 @@ export default function LectureCard({ lecture }: LectureCardProps) {
     }
   };
 
+  const isCustom = lecture.number && lecture.number.startsWith('custom-');
+  const custom = isCustom ? customLectureStorage.getCustomLecture(lecture.number) : null;
   const cleanNum = lecture.number ? String(parseInt(lecture.number, 10)) : "1";
-  const ytId = YOUTUBE_LECTURES[cleanNum] || "Edsxf_NBFrw";
-  const thumbnailUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+  const ytId = custom?.youtubeId || YOUTUBE_LECTURES[cleanNum] || "Edsxf_NBFrw";
+  const isCustomFile = isCustom && custom?.videoType === 'file';
+  const thumbnailUrl = !isCustomFile ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '';
 
   return (
     <div className="card overflow-hidden group border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all duration-300 hover:shadow-lg flex flex-col justify-between bg-[var(--color-surface)]">
@@ -60,7 +64,7 @@ export default function LectureCard({ lecture }: LectureCardProps) {
         to={`/lectures/${lecture.number}`}
         className="block relative aspect-video w-full overflow-hidden bg-zinc-900 cursor-pointer no-underline"
       >
-        {!imgError ? (
+        {!imgError && thumbnailUrl ? (
           <img
             src={thumbnailUrl}
             alt={lecture.title}
@@ -69,13 +73,25 @@ export default function LectureCard({ lecture }: LectureCardProps) {
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center">
-            <span className="text-zinc-600 font-mono text-xs">Video {lecture.number}</span>
+          <div className="w-full h-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 flex flex-col items-center justify-center p-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-[var(--color-accent)]/20 text-[var(--color-accent)] flex items-center justify-center mb-2">
+              <Video size={20} />
+            </div>
+            <span className="text-zinc-300 font-medium text-xs truncate max-w-[200px]">
+              {isCustom ? 'Custom Uploaded Video' : `Video ${lecture.number}`}
+            </span>
           </div>
         )}
 
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 opacity-70 group-hover:opacity-50 transition-opacity" />
+
+        {/* Custom Video Badge */}
+        {isCustom && (
+          <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-full bg-[var(--color-accent)] text-white font-semibold text-[10px] shadow-sm flex items-center gap-1">
+            <Sparkles size={10} /> Custom Video
+          </div>
+        )}
 
         {/* Play Icon in center on hover */}
         <div className="absolute inset-0 flex items-center justify-center">

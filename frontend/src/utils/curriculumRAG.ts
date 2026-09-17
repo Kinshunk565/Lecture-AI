@@ -1,4 +1,5 @@
 import { LECTURE_CURRICULUM, type LectureCurriculum } from '../data/lectureCurriculum';
+import { customLectureStorage } from '../services/customLectureStorage';
 import type { AskResponse, Source } from '../types';
 
 function parseTimestampToSeconds(timeStr: string): number {
@@ -17,13 +18,27 @@ export function answerFromCurriculum(question: string, lectureNumber?: string): 
   const qLower = question.toLowerCase();
   const sources: Source[] = [];
 
-  // 1. Identify target lecture: either specified or by best semantic keyword match across all 18
-  let targetNum = lectureNumber ? String(parseInt(lectureNumber, 10)) : '';
+  // 1. Identify target lecture: either custom, specified, or by best semantic keyword match across all 18
+  let targetNum = lectureNumber || '';
   let curriculum: LectureCurriculum | undefined;
 
-  if (targetNum && LECTURE_CURRICULUM[targetNum]) {
-    curriculum = LECTURE_CURRICULUM[targetNum];
-  } else {
+  if (targetNum && String(targetNum).startsWith('custom-')) {
+    const custom = customLectureStorage.getCustomLecture(targetNum);
+    if (custom) {
+      curriculum = custom.curriculum;
+      targetNum = custom.number;
+    }
+  }
+
+  if (!curriculum && targetNum) {
+    const cleanNum = String(parseInt(targetNum, 10));
+    if (LECTURE_CURRICULUM[cleanNum]) {
+      curriculum = LECTURE_CURRICULUM[cleanNum];
+      targetNum = cleanNum;
+    }
+  }
+
+  if (!curriculum) {
     // Search across all 18 lectures for the highest keyword affinity
     let bestScore = -1;
     let bestKey = '1';

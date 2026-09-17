@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import type { Lecture, TranscriptChunk } from '../types';
 import { formatDuration } from './formatTime';
 import { LECTURE_CURRICULUM, type LectureCurriculum } from '../data/lectureCurriculum';
+import { customLectureStorage } from '../services/customLectureStorage';
 
 interface TimelineSegment {
   timeRange: string;
@@ -76,10 +77,23 @@ export async function generateLecturePdfSummary(
   lecture: Lecture,
   chunks: TranscriptChunk[] = []
 ): Promise<void> {
-  const cleanNum = lecture.number ? String(parseInt(lecture.number, 10)) : '1';
+  const isCustom = lecture.number && lecture.number.startsWith('custom-');
+  const cleanNum = lecture.number ? String(parseInt(lecture.number, 10) || lecture.number) : '1';
 
-  // 1. Ensure full transcript chunks are loaded if empty
+  let customCurriculum: LectureCurriculum | null = null;
   let activeChunks = chunks;
+
+  if (isCustom) {
+    const custom = customLectureStorage.getCustomLecture(lecture.number);
+    if (custom) {
+      customCurriculum = custom.curriculum;
+      if (!activeChunks || activeChunks.length === 0) {
+        activeChunks = custom.chunks;
+      }
+    }
+  }
+
+  // 1. Ensure full transcript chunks are loaded if empty for core lectures
   if (!activeChunks || activeChunks.length === 0) {
     try {
       const res = await fetch(`/transcripts/${cleanNum}.json`);
@@ -94,7 +108,7 @@ export async function generateLecturePdfSummary(
     }
   }
 
-  const curriculum: LectureCurriculum = LECTURE_CURRICULUM[cleanNum] || {
+  const curriculum: LectureCurriculum = customCurriculum || LECTURE_CURRICULUM[cleanNum] || {
     title: lecture.title,
     category: 'Full Stack Web Development Curriculum',
     overview: `In this lecture of the Sigma Web Development Course, the instructor explains the core mechanics of ${lecture.title}. The lesson covers technical definitions, structural principles, live coding demos, and professional web engineering best practices.`,

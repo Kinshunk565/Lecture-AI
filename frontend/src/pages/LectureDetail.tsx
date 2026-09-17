@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { FileText, ChevronLeft, Download, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { FileText, ChevronLeft, Download, Loader2, Trash2, Sparkles } from 'lucide-react';
 import { api } from '../services/api';
 import type { Lecture, TranscriptChunk, Source } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
@@ -12,10 +11,14 @@ import { useHistory } from '../hooks/useHistory';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { formatDuration } from '../utils/formatTime';
 import { generateLecturePdfSummary } from '../utils/generatePdfSummary';
+import { customLectureStorage } from '../services/customLectureStorage';
 
 export default function LectureDetail() {
   const { number } = useParams<{ number: string }>();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const isCustom = number?.startsWith('custom-');
+
   const [lecture, setLecture] = useState<Lecture | null>(null);
   const [chunks, setChunks] = useState<TranscriptChunk[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +33,14 @@ export default function LectureDetail() {
 
   const { addToHistory } = useHistory();
   const { addBookmark, isBookmarked } = useBookmarks();
+
+  const handleDeleteCustom = useCallback(() => {
+    if (!number) return;
+    if (window.confirm('Are you sure you want to remove this custom video and its notes?')) {
+      customLectureStorage.deleteCustomLecture(number);
+      navigate('/lectures');
+    }
+  }, [number, navigate]);
 
   useEffect(() => {
     if (!number) return;
@@ -122,7 +133,13 @@ export default function LectureDetail() {
                 {lecture.title}
               </h1>
               <div className="flex items-center gap-3 text-xs text-[var(--color-secondary)]">
-                <span>Video {lecture.number}</span>
+                {isCustom ? (
+                  <span className="px-2 py-0.5 rounded-full bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold text-[11px] flex items-center gap-1">
+                    <Sparkles size={11} /> Custom Video
+                  </span>
+                ) : (
+                  <span>Video {lecture.number}</span>
+                )}
                 <span>·</span>
                 <span className="flex items-center gap-1"><FileText size={11} /> {lecture.chunk_count} segments</span>
                 {lecture.duration > 0 && (
@@ -135,25 +152,38 @@ export default function LectureDetail() {
             </div>
           </div>
 
-          {/* Download PDF Button */}
-          <button
-            onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="btn-secondary text-xs font-medium flex items-center justify-center gap-2 self-start sm:self-auto py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
-            title="Download structured AI study summary PDF of this lecture"
-          >
-            {isDownloadingPdf ? (
-              <>
-                <Loader2 size={14} className="animate-spin text-[var(--color-accent)]" />
-                <span>Generating PDF...</span>
-              </>
-            ) : (
-              <>
-                <Download size={14} className="text-[var(--color-accent)]" />
-                <span>Download Summary PDF</span>
-              </>
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            {isCustom && (
+              <button
+                onClick={handleDeleteCustom}
+                className="btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all cursor-pointer shadow-sm"
+                title="Remove this imported video"
+              >
+                <Trash2 size={13} />
+                <span>Remove</span>
+              </button>
             )}
-          </button>
+
+            {/* Download PDF Button */}
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="btn-secondary text-xs font-medium flex items-center justify-center gap-2 py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
+              title="Download structured AI study summary PDF of this lecture"
+            >
+              {isDownloadingPdf ? (
+                <>
+                  <Loader2 size={14} className="animate-spin text-[var(--color-accent)]" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={14} className="text-[var(--color-accent)]" />
+                  <span>Download Master Study Guide (PDF)</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

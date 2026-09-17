@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Search, Clock, CheckCircle, Mic, Brain, Play } from 'lucide-react';
+import { ArrowRight, BookOpen, Search, Clock, CheckCircle, Mic, Brain, Play, Sparkles } from 'lucide-react';
 import Footer from '../components/layout/Footer';
 import InteractiveHeroDemo from '../components/InteractiveHeroDemo';
+import ImportVideoModal from '../components/ImportVideoModal';
 
 const features = [
   { icon: Brain, title: 'Semantic Understanding', desc: 'Find concepts based on meaning, not just keywords. BGE-M3 embeddings capture deep semantic relationships.' },
@@ -27,6 +29,8 @@ const techStack = [
 ];
 
 export default function Landing() {
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Hero */}
@@ -43,10 +47,16 @@ export default function Landing() {
             <p className="text-lg text-[var(--color-secondary)] leading-relaxed max-w-xl mx-auto mb-8">
               LectureAI transforms recorded lectures into an intelligent, searchable knowledge base. Ask questions in natural language and jump directly to the moment where the concept was explained.
             </p>
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <Link to="/lectures" className="btn-primary text-base px-6 py-3">
                 Explore Lectures <ArrowRight size={16} />
               </Link>
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="btn-accent text-base px-6 py-3 inline-flex items-center gap-2 cursor-pointer shadow-md hover:shadow-lg transition-all"
+              >
+                <Sparkles size={16} /> Process Any Video
+              </button>
               <Link to="/search" className="btn-secondary text-base px-6 py-3">
                 Search Lectures
               </Link>
@@ -177,6 +187,11 @@ export default function Landing() {
       </section>
 
       <Footer />
+
+      <ImportVideoModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </div>
   );
 }

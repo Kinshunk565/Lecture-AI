@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
-import { Home, BookOpen, LayoutDashboard, Library, Search, Clock, BarChart3, Settings, Bookmark } from 'lucide-react';
+import { Home, BookOpen, LayoutDashboard, Library, Search, Clock, BarChart3, Settings, Bookmark, Plus } from 'lucide-react';
+import ImportVideoModal from '../ImportVideoModal';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
@@ -13,6 +15,7 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const location = useLocation();
   const isLanding = location.pathname === '/';
   if (isLanding) return null;
@@ -48,11 +51,26 @@ export default function Sidebar() {
           ))}
         </nav>
 
+        <div className="px-3 mb-2">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[var(--color-accent)] text-white text-xs font-semibold shadow-sm hover:opacity-95 transition-all cursor-pointer"
+          >
+            <Plus size={15} />
+            <span>Import Video / Link</span>
+          </button>
+        </div>
+
         <div className="px-5 py-4 border-t border-[var(--color-border)]">
           <p className="text-xs text-[var(--color-secondary)]">LectureAI v1.0</p>
           <p className="text-xs text-[var(--color-secondary)] opacity-60">AI-powered lecture intelligence</p>
         </div>
       </aside>
+
+      <ImportVideoModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
 
       {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-surface)] border-t border-[var(--color-border)] px-2 py-1.5 flex justify-around">
