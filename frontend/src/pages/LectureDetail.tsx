@@ -1,19 +1,43 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { FileText, ChevronLeft, ChevronRight, Download, Loader2, Trash2, Sparkles, ListVideo, ChevronDown } from 'lucide-react';
+import {
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  Trash2,
+  Sparkles,
+  ListVideo,
+  ChevronDown,
+  CheckCircle2,
+  Circle,
+  BookOpen,
+  MessageSquare,
+  HelpCircle,
+  Code2,
+  Network,
+  PenTool,
+} from 'lucide-react';
 import { api } from '../services/api';
 import type { Lecture, TranscriptChunk, Source } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
 import AIChat from '../components/AIChat';
 import TranscriptViewer from '../components/TranscriptViewer';
 import LoadingState from '../components/LoadingState';
+import InteractiveQuiz from '../components/InteractiveQuiz';
+import CodePlayground from '../components/CodePlayground';
+import ConceptGraph from '../components/ConceptGraph';
+import LectureNotes from '../components/LectureNotes';
 import { useHistory } from '../hooks/useHistory';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { formatDuration } from '../utils/formatTime';
 import { generateLecturePdfSummary, generateCoursePdfSummary } from '../utils/generatePdfSummary';
 import { customLectureStorage } from '../services/customLectureStorage';
 import { courseStorage } from '../services/courseStorage';
-import { CheckCircle2, Circle, BookOpen } from 'lucide-react';
+import { LECTURE_CURRICULUM } from '../data/lectureCurriculum';
+
+type WorkbenchTab = 'ai' | 'quiz' | 'code' | 'mindmap' | 'notes' | 'transcript';
 
 export default function LectureDetail() {
   const { number } = useParams<{ number: string }>();
@@ -32,17 +56,23 @@ export default function LectureDetail() {
   const [isDownloadingCoursePdf, setIsDownloadingCoursePdf] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ai' | 'transcript'>(
+  const [activeTab, setActiveTab] = useState<WorkbenchTab>(
     searchParams.get('ask') === 'true' ? 'ai' : 'ai'
   );
 
   const { addToHistory } = useHistory();
   const { addBookmark, isBookmarked } = useBookmarks();
 
+  const cleanNum = isCustom && number ? number : String(parseInt(number || '1', 10) || '1');
+  const curriculum = isCustom && number
+    ? (customLectureStorage.getCustomLecture(number)?.curriculum || null)
+    : (LECTURE_CURRICULUM[cleanNum] || null);
+
   // Course & Playlist sequence mapping
   const courseData = isCustom && number ? courseStorage.getCourseForLecture(number) : null;
   const isCoreCourse = !isCustom && number && !isNaN(parseInt(number, 10));
   const coreNum = isCoreCourse ? parseInt(number, 10) : 0;
+
 
   useEffect(() => {
     if (number) {
@@ -402,54 +432,135 @@ export default function LectureDetail() {
           </div>
         </div>
 
-        {/* Right: AI Chat + Transcript tabs (on smaller screens) */}
-        <div className="lg:w-[40%] border-l border-[var(--color-border)] flex flex-col" style={{ height: 'calc(100vh - 73px)' }}>
-          {/* Tab bar for mobile */}
-          <div className="lg:hidden flex border-b border-[var(--color-border)]">
+        {/* Right: Multi-Tool Learning Workbench */}
+        <div className="lg:w-[40%] border-l border-[var(--color-border)] flex flex-col bg-[var(--color-surface)]" style={{ height: 'calc(100vh - 73px)' }}>
+          {/* Workbench Tab Bar */}
+          <div className="flex border-b border-[var(--color-border)] bg-[var(--color-background)]/80 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('ai')}
-              className={`flex-1 py-3 text-sm font-medium text-center transition-colors ${
+              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
                 activeTab === 'ai'
-                  ? 'text-[var(--color-accent)] border-b-2 border-[var(--color-accent)]'
-                  : 'text-[var(--color-secondary)]'
+                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
+                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
               }`}
             >
-              Ask AI
+              <MessageSquare size={13} />
+              <span>Ask AI</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('quiz')}
+              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
+                activeTab === 'quiz'
+                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
+                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
+              }`}
+            >
+              <HelpCircle size={13} />
+              <span>Quiz & Cards</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('code')}
+              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
+                activeTab === 'code'
+                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
+                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
+              }`}
+            >
+              <Code2 size={13} />
+              <span>Playground</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('mindmap')}
+              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
+                activeTab === 'mindmap'
+                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
+                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
+              }`}
+            >
+              <Network size={13} />
+              <span>Mind Map</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('notes')}
+              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
+                activeTab === 'notes'
+                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
+                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
+              }`}
+            >
+              <PenTool size={13} />
+              <span>Notes</span>
             </button>
             <button
               onClick={() => setActiveTab('transcript')}
-              className={`flex-1 py-3 text-sm font-medium text-center transition-colors ${
+              className={`lg:hidden px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
                 activeTab === 'transcript'
-                  ? 'text-[var(--color-accent)] border-b-2 border-[var(--color-accent)]'
-                  : 'text-[var(--color-secondary)]'
+                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
+                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
               }`}
             >
-              Transcript
+              <FileText size={13} />
+              <span>Transcript</span>
             </button>
           </div>
 
-          {/* AI Chat (always visible on desktop, tab on mobile) */}
-          <div className={`flex-1 overflow-hidden ${activeTab !== 'ai' ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}`}>
-            <AIChat
-              lectureNumber={number}
-              onSeek={handleSeek}
-              onAddToHistory={handleAddToHistory}
-              onBookmarkSource={handleBookmarkSource}
-              isSourceBookmarked={(num, start) => isBookmarked(num, start)}
-            />
-          </div>
+          {/* Workbench Tab Contents */}
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {activeTab === 'ai' && (
+              <AIChat
+                lectureNumber={number}
+                onSeek={handleSeek}
+                onAddToHistory={handleAddToHistory}
+                onBookmarkSource={handleBookmarkSource}
+                isSourceBookmarked={(num, start) => isBookmarked(num, start)}
+              />
+            )}
 
-          {/* Transcript tab for mobile */}
-          <div className={`flex-1 overflow-hidden lg:hidden ${activeTab !== 'transcript' ? 'hidden' : 'flex flex-col'}`}>
-            <TranscriptViewer
-              chunks={chunks}
-              currentTime={currentTime}
-              onSeek={handleSeek}
-              highlightedStart={highlightedStart}
-            />
+            {activeTab === 'quiz' && (
+              <InteractiveQuiz
+                lectureNumber={number!}
+                curriculum={curriculum}
+                onSeek={handleSeek}
+              />
+            )}
+
+            {activeTab === 'code' && (
+              <CodePlayground
+                lectureNumber={number!}
+                curriculum={curriculum}
+              />
+            )}
+
+            {activeTab === 'mindmap' && (
+              <ConceptGraph
+                lectureNumber={number!}
+                curriculum={curriculum}
+                onSeek={handleSeek}
+              />
+            )}
+
+            {activeTab === 'notes' && (
+              <LectureNotes
+                lectureNumber={number!}
+                lectureTitle={lecture.title}
+                currentTime={currentTime}
+                curriculum={curriculum}
+                onSeek={handleSeek}
+              />
+            )}
+
+            {activeTab === 'transcript' && (
+              <TranscriptViewer
+                chunks={chunks}
+                currentTime={currentTime}
+                onSeek={handleSeek}
+                highlightedStart={highlightedStart}
+              />
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 }
+
