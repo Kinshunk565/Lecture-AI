@@ -162,6 +162,11 @@ class ProcessVideoRequest(BaseModel):
     title: Optional[str] = None
     topic: Optional[str] = None
 
+class ProcessPlaylistRequest(BaseModel):
+    playlist_url: str
+    course_title: Optional[str] = None
+    max_videos: Optional[int] = 30
+
 
 # ─── Endpoints ─────────────────────────────────────────────────
 
@@ -350,8 +355,6 @@ async def process_video(req: ProcessVideoRequest):
     for i in range(step_count):
         start = i * step_interval
         end = (i + 1) * step_interval
-        m = start // 60
-        s = start % 60
         chunks.append({
             "number": "custom",
             "title": title,
@@ -365,6 +368,84 @@ async def process_video(req: ProcessVideoRequest):
         "title": title,
         "duration": duration,
         "chunks": chunks
+    }
+
+
+@app.post("/api/process-playlist")
+async def process_playlist(req: ProcessPlaylistRequest):
+    """Parse a YouTube playlist link or course and extract all video lessons."""
+    import re
+    import requests
+
+    playlist_id_match = re.search(r"[?&]list=([a-zA-Z0-9_-]+)", req.playlist_url)
+    if not playlist_id_match:
+        raise HTTPException(status_code=400, detail="Invalid YouTube playlist URL. Could not locate list ID.")
+
+    playlist_id = playlist_id_match.group(1)
+    url = f"https://www.youtube.com/playlist?list={playlist_id}"
+
+    title = req.course_title or "Full Video Course & Playlist"
+    channel = "Course Instructor"
+    videos = []
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+        r = requests.get(url, headers=headers, timeout=12)
+        if r.status_code == 200:
+            html = r.text
+            # Extract playlist title
+            title_match = re.search(r'<meta property="og:title" content="(.*?)"', html)
+            if title_match and not req.course_title:
+                title = title_match.group(1)
+
+            # Extract videos from ytInitialData
+            data_match = re.search(r"var ytInitialData = ({.*?});</script>", html)
+            if data_match:
+                try:
+                    init_data = json.loads(data_match.group(1))
+                    # Traverse to playlistVideoListRenderer
+                    contents = (
+                        init_data.get("contents", {})
+                        .get("twoColumnBrowseResultsRenderer", {})
+                        .get("tabs", [{}])[0]
+                        .get("tabRenderer", {})
+                        .get("content", {})
+                        .get("sectionListRenderer", {})
+                        .get("contents", [{}])[0]
+                        .get("itemSectionRenderer", {})
+                        .get("contents", [{}])[0]
+                        .get("playlistVideoListRenderer", {})
+                        .get("contents", [])
+                    )
+
+                    limit = req.max_videos or 30
+                    for item in contents:
+                        renderer = item.get("playlistVideoRenderer")
+                        if renderer and "videoId" in renderer:
+                            v_id = renderer.get("videoId")
+                            v_title = renderer.get("title", {}).get("runs", [{}])[0].get("text", "Video Lesson")
+                            videos.append({
+                                "ytId": v_id,
+                                "title": v_title,
+                                "duration": 1200
+                            })
+                            if len(videos) >= limit:
+                                break
+                except Exception as parse_err:
+                    logger.warning(f"Error parsing playlist JSON: {parse_err}")
+    except Exception as e:
+        logger.warning(f"Error fetching YouTube playlist: {e}")
+
+    return {
+        "status": "success",
+        "playlist_id": playlist_id,
+        "title": title,
+        "channel": channel,
+        "video_count": len(videos),
+        "videos": videos
     }
 
 

@@ -9,8 +9,15 @@ import {
   FileVideo,
   Video,
   AlertCircle,
+  ListVideo,
+  Layers,
 } from 'lucide-react';
-import { processCustomVideo, extractYouTubeId } from '../services/videoProcessor';
+import {
+  processCustomVideo,
+  processPlaylist,
+  extractYouTubeId,
+  extractPlaylistId,
+} from '../services/videoProcessor';
 
 interface ImportVideoModalProps {
   isOpen: boolean;
@@ -19,18 +26,29 @@ interface ImportVideoModalProps {
 
 export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'url' | 'file'>('url');
-  const [videoUrl, setVideoUrl] = useState('');
+  const [activeTab, setActiveTab] = useState<'playlist' | 'single' | 'file'>('playlist');
+  const [inputUrl, setInputUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [customTitle, setCustomTitle] = useState('');
-  const [customTopic, setCustomTopic] = useState('');
-  
+  const [customInstructor, setCustomInstructor] = useState('');
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressPhase, setProgressPhase] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputUrl(val);
+    setError(null);
+
+    // Auto-detect playlist vs single video
+    if (extractPlaylistId(val)) {
+      setActiveTab('playlist');
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -62,47 +80,108 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
   const handleProcess = useCallback(async () => {
     setError(null);
 
-    if (activeTab === 'url' && !videoUrl.trim()) {
-      setError('Please enter a YouTube video URL or online video link.');
-      return;
-    }
+    if (activeTab === 'playlist') {
+      if (!inputUrl.trim()) {
+        setError('Please enter a YouTube playlist link or course URL.');
+        return;
+      }
 
-    if (activeTab === 'file' && !selectedFile) {
-      setError('Please select or drag & drop a video file.');
-      return;
-    }
+      try {
+        setIsProcessing(true);
+        setProgressPhase('Connecting to YouTube Playlist...');
+        setProgressPercent(10);
 
-    try {
-      setIsProcessing(true);
-      setProgressPhase('Initializing video analysis pipeline...');
-      setProgressPercent(10);
+        const { firstLecture } = await processPlaylist({
+          playlistUrl: inputUrl.trim(),
+          customTitle: customTitle.trim() || undefined,
+          customInstructor: customInstructor.trim() || undefined,
+          onProgress: (phase, percent) => {
+            setProgressPhase(phase);
+            setProgressPercent(percent);
+          },
+        });
 
-      const customLecture = await processCustomVideo({
-        url: activeTab === 'url' ? videoUrl.trim() : undefined,
-        file: activeTab === 'file' && selectedFile ? selectedFile : undefined,
-        customTitle: customTitle.trim() || undefined,
-        customTopic: customTopic.trim() || undefined,
-        onProgress: (phase, percent) => {
-          setProgressPhase(phase);
-          setProgressPercent(percent);
-        },
-      });
-
-      // Brief pause to show 100% completion before navigating
-      setTimeout(() => {
+        setTimeout(() => {
+          setIsProcessing(false);
+          onClose();
+          navigate(`/lectures/${firstLecture.number}`);
+        }, 500);
+      } catch (err: any) {
         setIsProcessing(false);
-        onClose();
-        navigate(`/lectures/${customLecture.number}`);
-      }, 500);
-    } catch (err: any) {
-      setIsProcessing(false);
-      setError(err.message || 'Failed to process video. Please verify the URL or file.');
+        setError(err.message || 'Failed to process playlist. Please check the URL.');
+      }
+      return;
     }
-  }, [activeTab, videoUrl, selectedFile, customTitle, customTopic, navigate, onClose]);
+
+    if (activeTab === 'single') {
+      if (!inputUrl.trim()) {
+        setError('Please enter a YouTube video URL or online video link.');
+        return;
+      }
+
+      try {
+        setIsProcessing(true);
+        setProgressPhase('Initializing video analysis pipeline...');
+        setProgressPercent(10);
+
+        const customLecture = await processCustomVideo({
+          url: inputUrl.trim(),
+          customTitle: customTitle.trim() || undefined,
+          customTopic: customInstructor.trim() || undefined,
+          onProgress: (phase, percent) => {
+            setProgressPhase(phase);
+            setProgressPercent(percent);
+          },
+        });
+
+        setTimeout(() => {
+          setIsProcessing(false);
+          onClose();
+          navigate(`/lectures/${customLecture.number}`);
+        }, 500);
+      } catch (err: any) {
+        setIsProcessing(false);
+        setError(err.message || 'Failed to process video.');
+      }
+      return;
+    }
+
+    if (activeTab === 'file') {
+      if (!selectedFile) {
+        setError('Please select or drag & drop a video file.');
+        return;
+      }
+
+      try {
+        setIsProcessing(true);
+        setProgressPhase('Reading local video stream...');
+        setProgressPercent(15);
+
+        const customLecture = await processCustomVideo({
+          file: selectedFile,
+          customTitle: customTitle.trim() || undefined,
+          onProgress: (phase, percent) => {
+            setProgressPhase(phase);
+            setProgressPercent(percent);
+          },
+        });
+
+        setTimeout(() => {
+          setIsProcessing(false);
+          onClose();
+          navigate(`/lectures/${customLecture.number}`);
+        }, 500);
+      } catch (err: any) {
+        setIsProcessing(false);
+        setError(err.message || 'Failed to process video file.');
+      }
+    }
+  }, [activeTab, inputUrl, selectedFile, customTitle, customInstructor, navigate, onClose]);
 
   if (!isOpen) return null;
 
-  const detectedYtId = activeTab === 'url' ? extractYouTubeId(videoUrl) : null;
+  const detectedPlaylistId = extractPlaylistId(inputUrl);
+  const detectedSingleYtId = extractYouTubeId(inputUrl);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -111,14 +190,14 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
         <div className="px-6 py-5 border-b border-[var(--color-border)] flex items-center justify-between bg-gradient-to-r from-[var(--color-accent)]/10 via-transparent to-transparent">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/30 flex items-center justify-center text-[var(--color-accent)]">
-              <Sparkles size={20} />
+              <Layers size={20} />
             </div>
             <div>
               <h2 className="text-lg font-bold text-[var(--color-primary)]">
-                Import & Process Custom Video
+                Import Course or Video Playlist
               </h2>
               <p className="text-xs text-[var(--color-secondary)]">
-                Paste any YouTube link or upload a video for instant AI study guides
+                Turn entire video courses & playlists into searchable AI knowledge bases
               </p>
             </div>
           </div>
@@ -134,7 +213,6 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
 
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-5">
-          {/* Processing Screen */}
           {isProcessing ? (
             <div className="py-12 px-4 flex flex-col items-center justify-center text-center space-y-6">
               <div className="relative">
@@ -149,7 +227,7 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
                   {progressPhase}
                 </h3>
                 <p className="text-xs text-[var(--color-secondary)] leading-relaxed">
-                  LectureAI is analyzing the video stream, synthesizing timestamped transcripts, generating code examples, and formatting your master study guide.
+                  LectureAI is indexing all video lessons, compiling timestamped transcript timelines, generating production code examples, and formatting full master study guides.
                 </p>
               </div>
 
@@ -162,7 +240,7 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
               </div>
 
               <div className="flex items-center gap-2 text-xs text-[var(--color-accent)] font-medium">
-                <CheckCircle2 size={14} /> Synced with interactive player, AI chat & study guide
+                <CheckCircle2 size={14} /> Full course syllabus, cross-lecture AI chat & master study guides
               </div>
             </div>
           ) : (
@@ -171,15 +249,27 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
               <div className="flex p-1 bg-[var(--color-background)] rounded-xl border border-[var(--color-border)]">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('url')}
+                  onClick={() => setActiveTab('playlist')}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'url'
+                    activeTab === 'playlist'
+                      ? 'bg-[var(--color-surface)] text-[var(--color-accent)] shadow-sm border border-[var(--color-border)]'
+                      : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+                  }`}
+                >
+                  <ListVideo size={16} />
+                  YouTube Playlist / Course
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('single')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${
+                    activeTab === 'single'
                       ? 'bg-[var(--color-surface)] text-[var(--color-accent)] shadow-sm border border-[var(--color-border)]'
                       : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
                   }`}
                 >
                   <Video size={16} />
-                  YouTube / Online Link
+                  Single Video Link
                 </button>
                 <button
                   type="button"
@@ -191,7 +281,7 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
                   }`}
                 >
                   <Upload size={16} />
-                  Upload Local Video
+                  Upload Local File
                 </button>
               </div>
 
@@ -203,21 +293,62 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
                 </div>
               )}
 
-              {/* URL Input */}
-              {activeTab === 'url' && (
+              {/* Playlist Tab */}
+              {activeTab === 'playlist' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--color-primary)] mb-1">
+                      YouTube Playlist Link or URL
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        placeholder="https://www.youtube.com/playlist?list=PLu0W_9lII9agq5TrH9XLIKQvv0iaF2X3w"
+                        value={inputUrl}
+                        onChange={handleUrlChange}
+                        className="w-full px-4 py-3 pl-10 text-xs rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-primary)] placeholder-[var(--color-secondary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+                      />
+                      <LinkIcon
+                        size={16}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-secondary)]"
+                      />
+                    </div>
+                  </div>
+
+                  {detectedPlaylistId && (
+                    <div className="p-3.5 bg-[var(--color-background)] rounded-xl border border-emerald-500/30 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                        <ListVideo size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-semibold text-emerald-400 block">
+                          ✓ YouTube Playlist Detected
+                        </span>
+                        <span className="text-[11px] text-[var(--color-secondary)] font-mono truncate block">
+                          List ID: {detectedPlaylistId}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-[var(--color-secondary)] leading-relaxed">
+                    💡 All lessons in the playlist will be imported in sequential order with transcripts, cross-lesson search, and individual Master Study Guides.
+                  </p>
+                </div>
+              )}
+
+              {/* Single Video Tab */}
+              {activeTab === 'single' && (
                 <div className="space-y-3">
                   <label className="block text-xs font-semibold text-[var(--color-primary)]">
-                    Video URL
+                    Single Video URL
                   </label>
                   <div className="relative">
                     <input
                       type="url"
                       placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
-                      value={videoUrl}
-                      onChange={(e) => {
-                        setVideoUrl(e.target.value);
-                        setError(null);
-                      }}
+                      value={inputUrl}
+                      onChange={handleUrlChange}
                       className="w-full px-4 py-3 pl-10 text-xs rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-primary)] placeholder-[var(--color-secondary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
                     />
                     <LinkIcon
@@ -226,19 +357,19 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
                     />
                   </div>
 
-                  {detectedYtId && (
+                  {detectedSingleYtId && (
                     <div className="p-3 bg-[var(--color-background)] rounded-xl border border-[var(--color-border)] flex items-center gap-3">
                       <img
-                        src={`https://img.youtube.com/vi/${detectedYtId}/default.jpg`}
+                        src={`https://img.youtube.com/vi/${detectedSingleYtId}/default.jpg`}
                         alt="Preview"
                         className="w-14 h-10 object-cover rounded-lg"
                       />
                       <div className="flex-1 min-w-0">
                         <span className="text-[11px] font-semibold text-emerald-400 block">
-                          ✓ Valid YouTube Video Detected
+                          ✓ YouTube Video Detected
                         </span>
                         <span className="text-[11px] font-mono text-[var(--color-secondary)] truncate block">
-                          Video ID: {detectedYtId}
+                          ID: {detectedSingleYtId}
                         </span>
                       </div>
                     </div>
@@ -246,7 +377,7 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
                 </div>
               )}
 
-              {/* File Upload Input */}
+              {/* File Upload Tab */}
               {activeTab === 'file' && (
                 <div className="space-y-3">
                   <label className="block text-xs font-semibold text-[var(--color-primary)]">
@@ -282,15 +413,15 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
                 </div>
               )}
 
-              {/* Optional Custom Title & Topic */}
-              <div className="space-y-3 pt-2 border-t border-[var(--color-border)]">
+              {/* Optional Course / Lecture Title & Instructor */}
+              <div className="space-y-3 pt-3 border-t border-[var(--color-border)]">
                 <div>
                   <label className="block text-xs font-semibold text-[var(--color-primary)] mb-1">
-                    Custom Lecture Title <span className="text-[var(--color-secondary)] font-normal">(Optional)</span>
+                    Course / Playlist Title <span className="text-[var(--color-secondary)] font-normal">(Optional)</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Master CSS Grid & Modern Responsive Layouts"
+                    placeholder="e.g. Complete React 19 & Next.js Full Stack Bootcamp"
                     value={customTitle}
                     onChange={(e) => setCustomTitle(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-primary)] placeholder-[var(--color-secondary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
@@ -299,13 +430,13 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
 
                 <div>
                   <label className="block text-xs font-semibold text-[var(--color-primary)] mb-1">
-                    Subject / Primary Focus <span className="text-[var(--color-secondary)] font-normal">(Optional)</span>
+                    Instructor / Channel Name <span className="text-[var(--color-secondary)] font-normal">(Optional)</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Web Development, React, Node.js, Python"
-                    value={customTopic}
-                    onChange={(e) => setCustomTopic(e.target.value)}
+                    placeholder="e.g. CodeWithHarry, FreeCodeCamp, Traversy Media"
+                    value={customInstructor}
+                    onChange={(e) => setCustomInstructor(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-primary)] placeholder-[var(--color-secondary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
                   />
                 </div>
@@ -330,7 +461,7 @@ export default function ImportVideoModal({ isOpen, onClose }: ImportVideoModalPr
               className="btn-accent px-5 py-2 text-xs font-semibold rounded-xl inline-flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
             >
               <Sparkles size={15} />
-              Start AI Processing
+              {activeTab === 'playlist' ? 'Process Full Course Playlist' : 'Start AI Processing'}
             </button>
           </div>
         )}

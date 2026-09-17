@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { FileText, ChevronLeft, Download, Loader2, Trash2, Sparkles } from 'lucide-react';
+import { FileText, ChevronLeft, ChevronRight, Download, Loader2, Trash2, Sparkles, ListVideo, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
 import type { Lecture, TranscriptChunk, Source } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
@@ -12,6 +12,7 @@ import { useBookmarks } from '../hooks/useBookmarks';
 import { formatDuration } from '../utils/formatTime';
 import { generateLecturePdfSummary } from '../utils/generatePdfSummary';
 import { customLectureStorage } from '../services/customLectureStorage';
+import { courseStorage } from '../services/courseStorage';
 
 export default function LectureDetail() {
   const { number } = useParams<{ number: string }>();
@@ -27,12 +28,36 @@ export default function LectureDetail() {
   const [currentTime, setCurrentTime] = useState(0);
   const [highlightedStart, setHighlightedStart] = useState<number | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'ai' | 'transcript'>(
     searchParams.get('ask') === 'true' ? 'ai' : 'ai'
   );
 
   const { addToHistory } = useHistory();
   const { addBookmark, isBookmarked } = useBookmarks();
+
+  // Course & Playlist sequence mapping
+  const courseData = isCustom && number ? courseStorage.getCourseForLecture(number) : null;
+  const isCoreCourse = !isCustom && number && !isNaN(parseInt(number, 10));
+  const coreNum = isCoreCourse ? parseInt(number, 10) : 0;
+
+  const prevLecturePath = courseData
+    ? (courseData.index > 0 ? `/lectures/${courseData.course.lectures[courseData.index - 1].number}` : null)
+    : (coreNum > 1 ? `/lectures/${coreNum - 1}` : null);
+
+  const nextLecturePath = courseData
+    ? (courseData.index < courseData.course.totalLectures - 1 ? `/lectures/${courseData.course.lectures[courseData.index + 1].number}` : null)
+    : (coreNum < 18 ? `/lectures/${coreNum + 1}` : null);
+
+  const courseTitle = courseData
+    ? courseData.course.title
+    : (isCoreCourse ? 'Sigma Web Development Course' : 'Video Lecture');
+
+  const courseProgressText = courseData
+    ? `Lesson ${courseData.index + 1} of ${courseData.course.totalLectures}`
+    : (isCoreCourse ? `Lesson ${coreNum} of 18` : null);
+
+  const playlistLectures = courseData ? courseData.course.lectures : [];
 
   const handleDeleteCustom = useCallback(() => {
     if (!number) return;
@@ -186,6 +211,85 @@ export default function LectureDetail() {
           </div>
         </div>
       </div>
+
+      {/* Course & Playlist Navigation Ribbon */}
+      {(courseProgressText || playlistLectures.length > 0) && (
+        <div className="px-6 py-2.5 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[var(--color-primary)] flex items-center gap-1.5">
+              <ListVideo size={14} className="text-[var(--color-accent)]" />
+              {courseTitle}
+            </span>
+            {courseProgressText && (
+              <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] text-[var(--color-secondary)] font-mono text-[11px] border border-[var(--color-border)]">
+                {courseProgressText}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {prevLecturePath ? (
+              <Link
+                to={prevLecturePath}
+                className="px-2.5 py-1 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-all flex items-center gap-1 text-[11px] no-underline"
+              >
+                <ChevronLeft size={13} />
+                <span>Previous Lesson</span>
+              </Link>
+            ) : (
+              <span className="px-2.5 py-1 text-[11px] text-[var(--color-secondary)] opacity-40 flex items-center gap-1 cursor-not-allowed">
+                <ChevronLeft size={13} /> Previous
+              </span>
+            )}
+
+            {nextLecturePath ? (
+              <Link
+                to={nextLecturePath}
+                className="px-2.5 py-1 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-all flex items-center gap-1 text-[11px] no-underline font-medium"
+              >
+                <span>Next Lesson</span>
+                <ChevronRight size={13} />
+              </Link>
+            ) : (
+              <span className="px-2.5 py-1 text-[11px] text-[var(--color-secondary)] opacity-40 flex items-center gap-1 cursor-not-allowed">
+                Next <ChevronRight size={13} />
+              </span>
+            )}
+
+            {playlistLectures.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsPlaylistOpen(!isPlaylistOpen)}
+                  className="px-2.5 py-1 rounded-lg bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                >
+                  <span>Playlist ({playlistLectures.length})</span>
+                  <ChevronDown size={12} className={`transform transition-transform ${isPlaylistOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isPlaylistOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-72 max-h-80 overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-xl z-50 p-1.5 space-y-1">
+                    {playlistLectures.map((item, idx) => (
+                      <Link
+                        key={item.number}
+                        to={`/lectures/${item.number}`}
+                        onClick={() => setIsPlaylistOpen(false)}
+                        className={`block p-2 rounded-lg text-[11px] no-underline transition-colors ${
+                          item.number === number
+                            ? 'bg-[var(--color-accent)] text-white font-medium'
+                            : 'text-[var(--color-secondary)] hover:bg-[var(--color-background)] hover:text-[var(--color-primary)]'
+                        }`}
+                      >
+                        <span className="font-semibold block truncate">Lesson {idx + 1}: {item.title}</span>
+                        <span className="text-[10px] opacity-80 block">{formatDuration(item.duration)}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex flex-col lg:flex-row">

@@ -25,6 +25,7 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState('');
+  const [scope, setScope] = useState<'lesson' | 'course'>('lesson');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -38,13 +39,15 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
+    const targetLec = scope === 'course' ? undefined : lectureNumber;
+
     // Animated loading phases
-    setLoadingPhase('Searching your lecture...');
-    const phaseTimer1 = setTimeout(() => setLoadingPhase('Finding relevant moments...'), 1500);
-    const phaseTimer2 = setTimeout(() => setLoadingPhase('Generating answer...'), 3000);
+    setLoadingPhase(scope === 'course' ? 'Searching full course knowledge base...' : 'Searching this lecture...');
+    const phaseTimer1 = setTimeout(() => setLoadingPhase('Finding relevant moments across lessons...'), 1500);
+    const phaseTimer2 = setTimeout(() => setLoadingPhase('Synthesizing answer...'), 3000);
 
     try {
-      const response = await api.ask(q, lectureNumber);
+      const response = await api.ask(q, targetLec);
       clearTimeout(phaseTimer1);
       clearTimeout(phaseTimer2);
 
@@ -62,7 +65,7 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
       clearTimeout(phaseTimer2);
       try {
         const { answerFromCurriculum } = await import('../utils/curriculumRAG');
-        const fallbackRes = answerFromCurriculum(q, lectureNumber);
+        const fallbackRes = answerFromCurriculum(q, targetLec);
         const assistantMsg: ChatMessage = {
           id: generateId(),
           role: 'assistant',
@@ -79,7 +82,7 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
       setLoading(false);
       setLoadingPhase('');
     }
-  }, [input, loading, lectureNumber, onAddToHistory]);
+  }, [input, loading, lectureNumber, scope, onAddToHistory]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -90,15 +93,42 @@ export default function AIChat({ lectureNumber, onSeek, onAddToHistory, onBookma
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-[var(--color-accent)]" />
-          <h3 className="text-sm font-semibold text-[var(--color-primary)]">Ask AI</h3>
+      {/* Header with Course Scope Toggle */}
+      <div className="px-4 py-3 border-b border-[var(--color-border)] flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-[var(--color-accent)]" />
+            <h3 className="text-sm font-semibold text-[var(--color-primary)]">Ask AI</h3>
+          </div>
+          <p className="text-xs text-[var(--color-secondary)] mt-0.5">
+            {scope === 'course' ? 'Searching across entire course playlist' : 'Searching this video'}
+          </p>
         </div>
-        <p className="text-xs text-[var(--color-secondary)] mt-0.5">
-          {lectureNumber ? `Ask about this lecture` : 'Ask about any lecture'}
-        </p>
+
+        {lectureNumber && (
+          <div className="flex p-0.5 bg-[var(--color-background)] rounded-lg border border-[var(--color-border)]">
+            <button
+              onClick={() => setScope('lesson')}
+              className={`px-2 py-1 text-[11px] rounded-md transition-all cursor-pointer ${
+                scope === 'lesson'
+                  ? 'bg-[var(--color-surface)] text-[var(--color-accent)] font-semibold shadow-sm'
+                  : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+              }`}
+            >
+              This Video
+            </button>
+            <button
+              onClick={() => setScope('course')}
+              className={`px-2 py-1 text-[11px] rounded-md transition-all cursor-pointer ${
+                scope === 'course'
+                  ? 'bg-[var(--color-surface)] text-[var(--color-accent)] font-semibold shadow-sm'
+                  : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+              }`}
+            >
+              Full Course
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
