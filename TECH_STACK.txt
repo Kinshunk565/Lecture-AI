@@ -1,0 +1,172 @@
+================================================================================
+🎓 LECTUREAI — COMPLETE TECH STACK & ARCHITECTURAL GUIDE
+================================================================================
+
+This document details every technology, framework, library, and architectural
+pattern used in LectureAI, explaining WHAT each tool is, WHERE it is used, and
+the ENGINEERING RATIONALE for choosing it.
+
+--------------------------------------------------------------------------------
+1. FRONTEND STACK (USER INTERFACE & LEARNING WORKBENCH)
+--------------------------------------------------------------------------------
+
+• React 19 (^19.2.8)
+  - What it is: Modern version of Facebook's industry-standard UI component library.
+  - Role: Powers the single-page application (SPA) component hierarchy.
+  - Why used: Provides concurrent rendering, efficient state scheduling, and fast DOM
+    reconciliation to smoothly render thousands of transcript chunks and video overlays.
+
+• TypeScript (~6.0.2)
+  - What it is: A strongly-typed superset of JavaScript developed by Microsoft.
+  - Role: Strict type safety across all frontend components, stores, and API clients.
+  - Why used: Prevents runtime bugs across complex data models (Lecture, TranscriptChunk,
+    CourseItem, LectureCurriculum, QuizItem) with compile-time type validation.
+
+• Vite 8 (^8.3.0)
+  - What it is: Next-generation, high-performance frontend build tool.
+  - Role: Development server and production bundler.
+  - Why used: Uses native ES modules (ESM) for sub-second hot module replacement during
+    development and Rolldown/Rollup for optimized production chunking (builds in <1s).
+
+• Tailwind CSS v4 (^4.3.3) & @tailwindcss/vite
+  - What it is: Newest generation utility-first CSS framework with zero-runtime engine.
+  - Role: Complete design system, dark-mode styling, and micro-animations.
+  - Why used: Allows writing modern, sleek, responsive UI styling directly in JSX
+    without maintaining large, fragile CSS files.
+
+• React Router v7 (^7.18.3)
+  - What it is: Declarative client-side routing library for React.
+  - Role: Single-page navigation between Courses (/lectures), Player (/lectures/:number),
+    Search (/search), History (/history), and Bookmarks (/bookmarks).
+  - Why used: Changes views instantly without full-page reloads, preserving video
+    playback position and application state.
+
+• Lucide React (^1.46.0)
+  - What it is: Clean, modern, accessible SVG icon library.
+  - Role: Icons for video controls, tabs, quiz indicators, console logs, and mind-map nodes.
+  - Why used: Lightweight, customizable, tree-shakable SVG icons with zero runtime bloat.
+
+• jsPDF (^4.2.1)
+  - What it is: Client-side vector PDF generation library.
+  - Role: Generates Master Course Syllabuses and Lecture Study Guides directly in the browser.
+  - Why used: Generates multi-page branded study guides with two-pass page numbering
+    (Page X of Y) directly on the client, eliminating heavy server-side PDF load.
+
+--------------------------------------------------------------------------------
+2. BACKEND & MACHINE LEARNING STACK (PYTHON API LAYER)
+--------------------------------------------------------------------------------
+
+• Python 3.10+
+  - What it is: Premier programming language for AI, data science, and backend APIs.
+  - Role: Server API runtime, vector search, and transcript preprocessing.
+  - Why used: Best-in-class ecosystem for AI, ML, NLP, and multimedia automation.
+
+• FastAPI (>=0.104.0)
+  - What it is: Modern, high-performance Python web framework built on Starlette & Pydantic.
+  - Role: REST API endpoints (/api/ask, /api/search, /api/process-playlist, /api/lectures).
+  - Why used: Native asynchronous concurrency (async/await), automatic Swagger UI
+    documentation (/docs), and superior speed compared to Flask or Django.
+
+• Uvicorn (>=0.24.0)
+  - What it is: Lightning-fast ASGI (Asynchronous Server Gateway Interface) web server.
+  - Role: Production HTTP server running the FastAPI application.
+  - Why used: Handles concurrent requests using Python's asyncio event loop on Render.
+
+• Pydantic (>=2.0.0)
+  - What it is: Data validation library using Python type annotations.
+  - Role: Validates incoming request payloads and serializes responses.
+  - Why used: Guarantees strict data validation and helpful error messages for API callers.
+
+• Sentence-Transformers (>=3.0.0) & PyTorch (>=2.0.0)
+  - What it is: State-of-the-art framework for dense vector sentence embeddings.
+  - Model Used: all-MiniLM-L6-v2 (384-dimensional dense semantic vectors).
+  - Role: Converts transcript text and user questions into dense vector embeddings.
+  - Why used: Powers true Semantic Search. A user asking "How do computers resolve
+    domains?" is accurately matched to video segments explaining "DNS and IP addresses".
+
+• Scikit-Learn (>=1.2.0) & NumPy (>=1.24.0)
+  - What it is: Core scientific computing and machine learning libraries.
+  - Role: Computes cosine similarity between user queries and transcript embeddings.
+  - Why used: Sub-millisecond vector similarity calculations across thousands of chunks.
+
+• Joblib (>=1.3.0)
+  - What it is: Lightweight pipelining and disk serialization library for Python objects.
+  - Role: Serializes and loads precomputed vector embeddings (embeddings.joblib, ~67MB).
+  - Why used: Allows the server to load all precomputed vector embeddings into memory
+    instantly on boot without recomputing models on every server restart.
+
+• Requests (>=2.31.0)
+  - What it is: Python HTTP library for web requests.
+  - Role: YouTube playlist and metadata scraping engine.
+  - Why used: Extracts ytInitialData from YouTube playlist pages without requiring
+    expensive API keys or hitting restrictive Google Cloud API quotas.
+
+--------------------------------------------------------------------------------
+3. MULTIMEDIA & AUDIO INGESTION PIPELINE (PREPROCESSING)
+--------------------------------------------------------------------------------
+
+• OpenAI Whisper (mp3_to_json.py)
+  - Role: Automatic Speech Recognition (ASR).
+  - Why used: Transcribes spoken lecture audio into clean, punctuated text with
+    word-level start and end timestamps.
+
+• MoviePy / FFmpeg (video_to_mp3.py)
+  - Role: Audio/video processing utility.
+  - Why used: Extracts compact .mp3 audio tracks from raw .mp4 videos for fast
+    speech recognition.
+
+• Sliding Window Chunker (preprocess_json.py)
+  - Role: Semantic text chunking.
+  - Why used: Aggregates short 2-second subtitle fragments into cohesive 30–60 second
+    paragraphs with clean start/end time boundaries for high-relevance RAG search.
+
+--------------------------------------------------------------------------------
+4. INTERACTIVE IN-BROWSER LEARNING ENGINES
+--------------------------------------------------------------------------------
+
+• Sandboxed Code Playground (CodePlayground.tsx)
+  - Tech: HTML5 iframe (sandbox="allow-scripts"), window.postMessage, Monaco-style editor.
+  - Why: Lets students write HTML/CSS/JS and view live preview results next to the video.
+    A virtual console bridge intercepts console.log() calls and displays them in real time.
+
+• Active Recall & Anki Flashcard Engine (InteractiveQuiz.tsx)
+  - Tech: CSS 3D Transforms (rotateY), React state machine, automated distractor generator.
+  - Why: Proven cognitive science techniques (active recall + spaced repetition) that
+    dramatically improve knowledge retention over passive video watching.
+
+• Concept Knowledge Graph / Mind-Map (ConceptGraph.tsx)
+  - Tech: SVG vector canvas, connecting timeline rails, category filters.
+  - Why: Visualizes how lecture concepts connect to code blueprints, milestones, and traps.
+    Every node is clickable and deeply linked to the video timestamp (onSeek).
+
+• Timestamped Notes & Notion Exporter (LectureNotes.tsx)
+  - Tech: HTML5 localStorage, Markdown parser, dynamic Blob file download.
+  - Why: Auto-saves personal student notes per lecture. "Tag Video Time" inserts clickable
+    [⏱ MM:SS] timestamp badges. "Export to Markdown" produces clean .md files for Notion.
+
+• Client-Side RAG Fallback (curriculumRAG.ts & localSearch.ts)
+  - Tech: In-memory keyword & n-gram tokenizer, heuristic relevance ranking.
+  - Why: Guarantees zero-latency search and chat responses even if the backend is sleeping.
+
+--------------------------------------------------------------------------------
+5. HOSTING, CLOUD & DEVOPS INFRASTRUCTURE
+--------------------------------------------------------------------------------
+
+• Vercel
+  - Role: Frontend Cloud Hosting & Global Edge CDN.
+  - URL: https://lecture-ai-seven-beta.vercel.app
+  - Why: Provides fast worldwide delivery with zero server maintenance, automatic HTTPS,
+    and instantaneous preview deployments.
+
+• Render
+  - Role: Backend API Cloud Hosting.
+  - URL: https://lecture-ai-api.onrender.com
+  - Why: Runs the FastAPI Python server with continuous deployment from GitHub via
+    Procfile and Dockerfile.
+
+• Git & GitHub
+  - Role: Source Code Control & Continuous Integration / Continuous Deployment (CI/CD).
+  - Repository: https://github.com/Kinshunk565/Lecture-AI
+  - Why: Every push to main triggers automated build checks and deploys updates
+    to both Vercel and Render in real time.
+================================================================================
