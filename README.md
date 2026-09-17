@@ -21,6 +21,8 @@
 | **Backend API (Render)** | 🟢 **Active** | [https://lecture-ai-api.onrender.com](https://lecture-ai-api.onrender.com) |
 | **Interactive Swagger API Docs** | 🟢 **Active** | [https://lecture-ai-api.onrender.com/docs](https://lecture-ai-api.onrender.com/docs) |
 | **Source Code Repository** | 🐙 **Public** | [https://github.com/Kinshunk565/Lecture-AI](https://github.com/Kinshunk565/Lecture-AI) |
+| **Complete Tech Stack Guide** | 📖 **Comprehensive** | [TECH_STACK.md](./TECH_STACK.md) · [TECH_STACK.txt](./TECH_STACK.txt) |
+
 
 ---
 
