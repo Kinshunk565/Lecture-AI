@@ -151,7 +151,11 @@ def gemini_inference(prompt, model=None, retries=3):
                     {"text": prompt}
                 ]
             }
-        ]
+        ],
+        "generationConfig": {
+            "maxOutputTokens": 4096,
+            "temperature": 0.4
+        }
     }
 
     for attempt in range(retries):
@@ -212,12 +216,21 @@ def rag_query(question, df, top_k=5):
         logger.warning(f"Dense embedding search failed ({e}); falling back to fast lexical search.")
         result_df, scores = lexical_search(question, df, top_k=top_k)
 
-    prompt = f'''I am teaching web development in my Sigma web development course. Here are video subtitle chunks containing video title, video number, start time in seconds, end time in seconds, the text at that time:
+    prompt = f'''You are the Senior AI Teaching Assistant for the Sigma Web Development Course taught by CodeWithHarry.
+A student asked the following question:
+"{question}"
 
+Here are the most relevant lecture transcript chunks with video numbers, titles, start/end timestamps in seconds, and subtitle text:
 {result_df[["title", "number", "start", "end", "text"]].to_json(orient="records")}
 ---------------------------------
-"{question}"
-User asked this question related to the video chunks, you have to answer in a human way (dont mention the above format, its just for you) where and how much content is taught in which video (in which video and at what timestamp) and guide the user to go to that particular video. If user asks unrelated question, tell him that you can only answer questions related to the course
+CRITICAL INSTRUCTIONS FOR YOUR RESPONSE:
+1. Provide a comprehensive, in-depth, and thorough explanation that completely answers the student's question. Do NOT give brief or shallow 1-2 sentence replies.
+2. Explain the underlying concepts from first principles: explain why the technology works the way it does, how browsers interpret it, and real-world web engineering context.
+3. Provide complete, clean, syntax-highlighted code snippets with helpful comments whenever applicable.
+4. Cite the exact video numbers and timestamps where the instructor discusses these concepts (e.g. "In Video 2 at [04:15]...").
+5. Include developer best practices, common beginner pitfalls to avoid, and practical debugging tips.
+6. Use clean Markdown formatting with clear section headings (###), bulleted lists, bold key concepts, and formatted code blocks.
+7. If the question is completely unrelated to web development or this curriculum, guide them back to course topics.
 '''
     answer = gemini_inference(prompt)
     sources = []
