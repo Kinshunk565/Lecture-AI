@@ -10,9 +10,10 @@ import LoadingState from '../components/LoadingState';
 import { useHistory } from '../hooks/useHistory';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { formatDuration } from '../utils/formatTime';
-import { generateLecturePdfSummary } from '../utils/generatePdfSummary';
+import { generateLecturePdfSummary, generateCoursePdfSummary } from '../utils/generatePdfSummary';
 import { customLectureStorage } from '../services/customLectureStorage';
 import { courseStorage } from '../services/courseStorage';
+import { CheckCircle2, Circle, BookOpen } from 'lucide-react';
 
 export default function LectureDetail() {
   const { number } = useParams<{ number: string }>();
@@ -28,6 +29,8 @@ export default function LectureDetail() {
   const [currentTime, setCurrentTime] = useState(0);
   const [highlightedStart, setHighlightedStart] = useState<number | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isDownloadingCoursePdf, setIsDownloadingCoursePdf] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'ai' | 'transcript'>(
     searchParams.get('ask') === 'true' ? 'ai' : 'ai'
@@ -40,6 +43,12 @@ export default function LectureDetail() {
   const courseData = isCustom && number ? courseStorage.getCourseForLecture(number) : null;
   const isCoreCourse = !isCustom && number && !isNaN(parseInt(number, 10));
   const coreNum = isCoreCourse ? parseInt(number, 10) : 0;
+
+  useEffect(() => {
+    if (number) {
+      setIsCompleted(courseStorage.isLessonCompleted(number));
+    }
+  }, [number]);
 
   const prevLecturePath = courseData
     ? (courseData.index > 0 ? `/lectures/${courseData.course.lectures[courseData.index - 1].number}` : null)
@@ -58,6 +67,13 @@ export default function LectureDetail() {
     : (isCoreCourse ? `Lesson ${coreNum} of 18` : null);
 
   const playlistLectures = courseData ? courseData.course.lectures : [];
+
+  const handleToggleCompleted = useCallback(() => {
+    if (!number) return;
+    const next = courseStorage.toggleLessonCompleted(number);
+    setIsCompleted(next);
+  }, [number]);
+
 
   const handleDeleteCustom = useCallback(() => {
     if (!number) return;
@@ -130,6 +146,36 @@ export default function LectureDetail() {
     }
   }, [lecture, chunks]);
 
+  const handleDownloadCoursePdf = useCallback(async () => {
+    try {
+      setIsDownloadingCoursePdf(true);
+      if (courseData) {
+        await generateCoursePdfSummary(
+          courseData.course.title,
+          courseData.course.instructor,
+          courseData.course.lectures
+        );
+      } else if (isCoreCourse) {
+        const res = await api.getLectures();
+        const coreLessons = (res.lectures || []).map((l: Lecture) => ({
+          number: l.number,
+          title: l.title,
+          duration: l.duration,
+        }));
+        await generateCoursePdfSummary(
+          'Sigma Web Development Course',
+          'CodeWithHarry',
+          coreLessons
+        );
+      }
+
+    } catch (err) {
+      console.error('Failed to generate course syllabus PDF:', err);
+    } finally {
+      setIsDownloadingCoursePdf(false);
+    }
+  }, [courseData, isCoreCourse]);
+
   if (loading) return <LoadingState message="Loading lecture..." />;
   if (error || !lecture) {
     return (
@@ -177,7 +223,7 @@ export default function LectureDetail() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             {isCustom && (
               <button
                 onClick={handleDeleteCustom}
@@ -189,22 +235,44 @@ export default function LectureDetail() {
               </button>
             )}
 
-            {/* Download PDF Button */}
+            {/* Download Course Syllabus PDF Button (if part of course) */}
+            {(courseData || isCoreCourse) && (
+              <button
+                onClick={handleDownloadCoursePdf}
+                disabled={isDownloadingCoursePdf}
+                className="btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
+                title="Download full course syllabus & study guide containing all lessons"
+              >
+                {isDownloadingCoursePdf ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin text-[var(--color-accent)]" />
+                    <span>Generating Course PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <BookOpen size={13} className="text-[var(--color-accent)]" />
+                    <span>Course Syllabus (PDF)</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Download Lesson PDF Button */}
             <button
               onClick={handleDownloadPdf}
               disabled={isDownloadingPdf}
-              className="btn-secondary text-xs font-medium flex items-center justify-center gap-2 py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
+              className="btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
               title="Download structured AI study summary PDF of this lecture"
             >
               {isDownloadingPdf ? (
                 <>
-                  <Loader2 size={14} className="animate-spin text-[var(--color-accent)]" />
+                  <Loader2 size={13} className="animate-spin text-[var(--color-accent)]" />
                   <span>Generating PDF...</span>
                 </>
               ) : (
                 <>
-                  <Download size={14} className="text-[var(--color-accent)]" />
-                  <span>Download Master Study Guide (PDF)</span>
+                  <Download size={13} className="text-[var(--color-accent)]" />
+                  <span>Lesson Guide (PDF)</span>
                 </>
               )}
             </button>
@@ -228,13 +296,27 @@ export default function LectureDetail() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Mark Lesson Completed Toggle */}
+            <button
+              onClick={handleToggleCompleted}
+              className={`px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 text-[11px] font-medium cursor-pointer ${
+                isCompleted
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                  : 'bg-[var(--color-background)] border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+              }`}
+              title="Mark lesson completed"
+            >
+              {isCompleted ? <CheckCircle2 size={13} className="text-emerald-400" /> : <Circle size={13} />}
+              <span>{isCompleted ? 'Completed' : 'Mark Complete'}</span>
+            </button>
+
             {prevLecturePath ? (
               <Link
                 to={prevLecturePath}
                 className="px-2.5 py-1 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-all flex items-center gap-1 text-[11px] no-underline"
               >
                 <ChevronLeft size={13} />
-                <span>Previous Lesson</span>
+                <span>Previous</span>
               </Link>
             ) : (
               <span className="px-2.5 py-1 text-[11px] text-[var(--color-secondary)] opacity-40 flex items-center gap-1 cursor-not-allowed">
@@ -245,6 +327,9 @@ export default function LectureDetail() {
             {nextLecturePath ? (
               <Link
                 to={nextLecturePath}
+                onClick={() => {
+                  if (number) courseStorage.markLessonCompleted(number, true);
+                }}
                 className="px-2.5 py-1 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-all flex items-center gap-1 text-[11px] no-underline font-medium"
               >
                 <span>Next Lesson</span>
@@ -255,6 +340,7 @@ export default function LectureDetail() {
                 Next <ChevronRight size={13} />
               </span>
             )}
+
 
             {playlistLectures.length > 0 && (
               <div className="relative">

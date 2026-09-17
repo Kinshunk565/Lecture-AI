@@ -605,3 +605,352 @@ export async function generateLecturePdfSummary(
   const filename = `Lecture_${lecture.number}_${curriculum.title.replace(/[^a-zA-Z0-9]/g, '_')}_Master_Study_Guide.pdf`;
   doc.save(filename);
 }
+
+export interface CoursePdfLessonInput {
+  number: string;
+  title: string;
+  duration?: number;
+  curriculum?: LectureCurriculum;
+  chunks?: TranscriptChunk[];
+}
+
+export async function generateCoursePdfSummary(
+  courseTitle: string,
+  instructor: string = 'LectureAI Master Instructor',
+  lessons: CoursePdfLessonInput[] = []
+): Promise<void> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 16;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const addHeaderStrip = () => {
+    doc.setFillColor(74, 124, 111);
+    doc.rect(margin, y, contentWidth, 1.2, 'F');
+    y += 6;
+  };
+
+  const checkPageBreak = (neededHeight: number) => {
+    if (y + neededHeight > pageHeight - margin - 12) {
+      doc.addPage();
+      y = margin;
+      addHeaderStrip();
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // COVER PAGE
+  // ═══════════════════════════════════════════════════════════
+  doc.setFillColor(245, 248, 247);
+  doc.roundedRect(margin, y, contentWidth, 60, 4, 4, 'F');
+  doc.setDrawColor(205, 225, 220);
+  doc.roundedRect(margin, y, contentWidth, 60, 4, 4, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(74, 124, 111);
+  doc.text('🎓 LECTUREAI COMPLETE MASTER COURSE SYLLABUS & CURRICULUM GUIDE', margin + 8, y + 12);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(20, 20, 20);
+  const courseTitleLines = doc.splitTextToSize(courseTitle, contentWidth - 16);
+  doc.text(courseTitleLines, margin + 8, y + 23);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Lead Instructor: ${instructor}   •   Total Lessons: ${lessons.length} Modules   •   Comprehensive AI Edition`, margin + 8, y + 50);
+
+  y += 72;
+
+  // Executive Course Manifesto
+  checkPageBreak(35);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(74, 124, 111);
+  doc.text('Course Master Curriculum Overview', margin, y);
+  y += 6.5;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.2);
+  doc.setTextColor(45, 45, 45);
+  const manifesto = `Welcome to the official Master Course Syllabus for "${courseTitle}". This comprehensive syllabus unites every video lesson into a single, rigorous learning guide. Each chapter contains first-principles architectural theory, production code blueprints, beginner traps to avoid, practical laboratory exercises, and examination preparation.`;
+  const manifestoLines = doc.splitTextToSize(manifesto, contentWidth);
+  doc.text(manifestoLines, margin, y);
+  y += manifestoLines.length * 4.6 + 8;
+
+  // Table of Contents
+  checkPageBreak(30);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(30, 30, 30);
+  doc.text('Complete Course Syllabus & Chapter Index', margin, y);
+  y += 6;
+
+  lessons.forEach((les, idx) => {
+    const durStr = les.duration && les.duration > 0 ? formatDuration(les.duration) : 'Lesson';
+    const rowTitle = `Module ${idx + 1}: ${les.title}`;
+    const rowLines = doc.splitTextToSize(rowTitle, contentWidth - 30);
+    const rowH = rowLines.length * 4.2 + 2;
+
+    checkPageBreak(rowH + 2);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(74, 124, 111);
+    doc.text(`[CH ${idx + 1}]`, margin + 2, y + 3.2);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.8);
+    doc.setTextColor(35, 35, 35);
+    doc.text(rowLines, margin + 20, y + 3.2);
+
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(110, 110, 110);
+    doc.text(durStr, pageWidth - margin - 2, y + 3.2, { align: 'right' });
+
+    y += rowH + 2;
+  });
+
+  y += 6;
+
+  // ═══════════════════════════════════════════════════════════
+  // CHAPTER BREAKDOWNS
+  // ═══════════════════════════════════════════════════════════
+  for (let i = 0; i < lessons.length; i++) {
+    const lesson = lessons[i];
+    const cleanNum = lesson.number.startsWith('custom-')
+      ? lesson.number
+      : String(parseInt(lesson.number, 10) || lesson.number);
+
+    let curriculum = lesson.curriculum;
+    if (!curriculum) {
+      if (lesson.number.startsWith('custom-')) {
+        const custom = customLectureStorage.getCustomLecture(lesson.number);
+        if (custom) curriculum = custom.curriculum;
+      } else {
+        curriculum = LECTURE_CURRICULUM[cleanNum];
+      }
+    }
+
+    if (!curriculum) {
+      curriculum = {
+        title: lesson.title,
+        category: 'Full Stack Curriculum',
+        overview: `Comprehensive exploration of ${lesson.title} covering foundational mechanics, best practices, and code implementations.`,
+        theory: [
+          {
+            subheading: `1. Principles of ${lesson.title}`,
+            content: `This module details the design, syntax, and execution model required to master ${lesson.title}.`,
+          },
+        ],
+        code_samples: [],
+        reference_table: [],
+        milestones: [],
+        key_takeaways: [`Master ${lesson.title} fundamentals and production syntax.`],
+        pitfalls: ['Validate code structure and verify across browsers.'],
+        exercise: `Build a prototype implementing concepts taught in Chapter ${i + 1}.`,
+        quiz: [
+          {
+            question: `What is the key takeaway of ${lesson.title}?`,
+            answer: `It establishes the foundational patterns for building reliable, performant software.`,
+          },
+        ],
+      };
+    }
+
+    // Force page break for each new chapter
+    doc.addPage();
+    y = margin;
+    addHeaderStrip();
+
+    // Chapter Banner
+    doc.setFillColor(248, 250, 249);
+    doc.roundedRect(margin, y, contentWidth, 24, 2.5, 2.5, 'F');
+    doc.setDrawColor(215, 230, 225);
+    doc.roundedRect(margin, y, contentWidth, 24, 2.5, 2.5, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(74, 124, 111);
+    doc.text(`CHAPTER ${i + 1} OF ${lessons.length} · ${courseTitle.toUpperCase()}`, margin + 6, y + 7);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12.5);
+    doc.setTextColor(24, 24, 24);
+    const chTitleLines = doc.splitTextToSize(`Lesson ${i + 1}: ${curriculum.title}`, contentWidth - 12);
+    doc.text(chTitleLines, margin + 6, y + 16);
+
+    y += 30;
+
+    // Overview
+    checkPageBreak(25);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(74, 124, 111);
+    doc.text('Module Overview & Objectives', margin, y);
+    y += 5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(45, 45, 45);
+    const ovLines = doc.splitTextToSize(curriculum.overview, contentWidth);
+    doc.text(ovLines, margin, y);
+    y += ovLines.length * 4.4 + 6;
+
+    // Theory
+    if (curriculum.theory && curriculum.theory.length > 0) {
+      checkPageBreak(25);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(74, 124, 111);
+      doc.text('Core Technical Concepts', margin, y);
+      y += 5;
+
+      for (const t of curriculum.theory) {
+        const subLines = doc.splitTextToSize(t.subheading, contentWidth);
+        const conLines = doc.splitTextToSize(t.content, contentWidth - 4);
+        checkPageBreak(subLines.length * 4.6 + conLines.length * 4.3 + 6);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(30, 30, 30);
+        doc.text(subLines, margin, y);
+        y += subLines.length * 4.6 + 1.5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.7);
+        doc.setTextColor(55, 55, 55);
+        doc.text(conLines, margin + 2, y);
+        y += conLines.length * 4.3 + 5;
+      }
+    }
+
+    // Code Sample
+    if (curriculum.code_samples && curriculum.code_samples.length > 0) {
+      const codeSample = curriculum.code_samples[0];
+      const codeLines = codeSample.code.split('\n').slice(0, 18);
+      const boxHeight = codeLines.length * 4.1 + 9;
+
+      checkPageBreak(boxHeight + 18);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`▸ Code Implementation: ${codeSample.caption}`, margin, y);
+      y += 4.5;
+
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, y, contentWidth, boxHeight, 2, 2, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, y, contentWidth, boxHeight, 2, 2, 'S');
+
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 41, 59);
+
+      let codeY = y + 4.5;
+      for (const cl of codeLines) {
+        doc.text(cl, margin + 4, codeY);
+        codeY += 4.1;
+      }
+
+      y += boxHeight + 5;
+    }
+
+    // Key Takeaways & Traps
+    if (curriculum.pitfalls && curriculum.pitfalls.length > 0) {
+      checkPageBreak(25);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(180, 40, 40);
+      doc.text('Key Gotchas & Beginner Traps:', margin, y);
+      y += 4.5;
+
+      for (const p of curriculum.pitfalls.slice(0, 2)) {
+        const pLines = doc.splitTextToSize(p, contentWidth - 8);
+        checkPageBreak(pLines.length * 4.2 + 3);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(120, 28, 28);
+        doc.text(`• ${pLines[0]}`, margin + 2, y);
+        if (pLines.length > 1) {
+          doc.text(pLines.slice(1), margin + 6, y + 4.2);
+        }
+        y += pLines.length * 4.2 + 2;
+      }
+      y += 3;
+    }
+
+    // Hands-On Lab Exercise
+    if (curriculum.exercise) {
+      checkPageBreak(25);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(74, 124, 111);
+      doc.text('Hands-On Coding Lab Exercise:', margin, y);
+      y += 4.5;
+
+      const exLines = doc.splitTextToSize(curriculum.exercise, contentWidth - 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.6);
+      doc.setTextColor(40, 40, 40);
+      doc.text(exLines, margin + 2, y);
+      y += exLines.length * 4.3 + 5;
+    }
+
+    // Quiz Question
+    if (curriculum.quiz && curriculum.quiz.length > 0) {
+      const q = curriculum.quiz[0];
+      checkPageBreak(25);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
+      const qLines = doc.splitTextToSize(`Interview Question: ${q.question}`, contentWidth - 4);
+      doc.text(qLines, margin, y);
+      y += qLines.length * 4.4 + 1.5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(60, 60, 60);
+      const aLines = doc.splitTextToSize(`Model Answer: ${q.answer}`, contentWidth - 6);
+      doc.text(aLines, margin + 3, y);
+      y += aLines.length * 4.2 + 5;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // TWO-PASS PAGE NUMBERING
+  // ═══════════════════════════════════════════════════════════
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(130, 130, 130);
+    doc.text(
+      `LectureAI Master Course Syllabus · ${courseTitle}`,
+      margin,
+      pageHeight - 8
+    );
+    doc.text(
+      `Page ${p} of ${totalPages}`,
+      pageWidth - margin,
+      pageHeight - 8,
+      { align: 'right' }
+    );
+  }
+
+  const cleanFilename = `${courseTitle.replace(/[^a-zA-Z0-9]/g, '_')}_Master_Course_Syllabus.pdf`;
+  doc.save(cleanFilename);
+}
+

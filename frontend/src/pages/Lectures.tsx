@@ -143,120 +143,168 @@ export default function Lectures() {
         <div className="space-y-6">
           <div className="grid sm:grid-cols-2 gap-5">
             {/* Primary Sigma Web Dev Course */}
-            <div className="card overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all shadow-sm hover:shadow-md flex flex-col justify-between bg-[var(--color-surface)]">
-              <div>
-                <div className="relative aspect-video w-full overflow-hidden bg-zinc-900">
-                  <img
-                    src="https://img.youtube.com/vi/tVzUXW6siu0/hqdefault.jpg"
-                    alt="Sigma Web Development Course"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
-                  <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[var(--color-accent)] text-white text-[11px] font-bold shadow-md flex items-center gap-1.5">
-                    <Layers size={12} /> Featured Master Course
-                  </div>
-                  <div className="absolute bottom-3 left-3 right-3 text-white">
-                    <span className="text-xs font-medium text-emerald-300 block mb-0.5">CodeWithHarry · Complete Series</span>
-                    <h3 className="text-base font-bold leading-snug">Sigma Web Development Course</h3>
-                  </div>
-                </div>
+            {(() => {
+              const sigmaNums = Array.from({ length: 18 }, (_, i) => String(i + 1));
+              const sigmaProg = courseStorage.getCourseProgress(sigmaNums);
+              const nextSigmaNum = sigmaNums.find((n) => !courseStorage.isLessonCompleted(n)) || '1';
 
-                <div className="p-5 space-y-3">
-                  <p className="text-xs text-[var(--color-secondary)] leading-relaxed">
-                    18 sequential, comprehensive lectures taking you from HTML basics, semantic architecture, forms, CSS box model, selectors, flexbox, and grid into production-ready front-end engineering.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[var(--color-secondary)]">
-                    <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium">
-                      18 Video Lessons
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium">
-                      300+ Segments per Video
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium text-emerald-400">
-                      Full RAG Search
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 pt-0 border-t border-[var(--color-border)] mt-2 flex items-center justify-between">
-                <Link
-                  to="/lectures/1"
-                  className="btn-accent text-xs font-semibold py-2 px-4 rounded-xl inline-flex items-center gap-2 no-underline"
-                >
-                  <Play size={14} className="fill-white" /> Start Course (Lesson 1)
-                </Link>
-                <button
-                  onClick={() => setActiveTab('course')}
-                  className="text-xs font-semibold text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors cursor-pointer"
-                >
-                  View 18 Lessons →
-                </button>
-              </div>
-            </div>
-
-            {/* Custom Imported Courses */}
-            {filteredCourses.map((course) => (
-              <div
-                key={course.id}
-                className="card overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all shadow-sm hover:shadow-md flex flex-col justify-between bg-[var(--color-surface)]"
-              >
-                <div>
-                  <div className="relative aspect-video w-full overflow-hidden bg-zinc-900">
-                    {course.thumbnailUrl ? (
+              return (
+                <div className="card overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all shadow-sm hover:shadow-md flex flex-col justify-between bg-[var(--color-surface)]">
+                  <div>
+                    <div className="relative aspect-video w-full overflow-hidden bg-zinc-900">
                       <img
-                        src={course.thumbnailUrl}
-                        alt={course.title}
+                        src="https://img.youtube.com/vi/tVzUXW6siu0/hqdefault.jpg"
+                        alt="Sigma Web Development Course"
                         className="w-full h-full object-cover"
                       />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center">
-                        <Layers size={32} className="text-[var(--color-accent)]" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
+                      <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[var(--color-accent)] text-white text-[11px] font-bold shadow-md flex items-center gap-1.5">
+                        <Layers size={12} /> Featured Master Course
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
-                    <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[var(--color-accent)] text-white text-[11px] font-bold shadow-md flex items-center gap-1.5">
-                      <ListVideo size={12} /> Imported Playlist
+                      <div className="absolute bottom-3 left-3 right-3 text-white">
+                        <span className="text-xs font-medium text-emerald-300 block mb-0.5">CodeWithHarry · Complete Series</span>
+                        <h3 className="text-base font-bold leading-snug">Sigma Web Development Course</h3>
+                      </div>
                     </div>
-                    <div className="absolute bottom-3 left-3 right-3 text-white">
-                      <span className="text-xs font-medium text-emerald-300 block mb-0.5">{course.instructor}</span>
-                      <h3 className="text-base font-bold leading-snug truncate">{course.title}</h3>
+
+                    <div className="p-5 space-y-3">
+                      <p className="text-xs text-[var(--color-secondary)] leading-relaxed">
+                        18 sequential, comprehensive lectures taking you from HTML basics, semantic architecture, forms, CSS box model, selectors, flexbox, and grid into production-ready front-end engineering.
+                      </p>
+
+                      {/* Course Progress Bar */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-[var(--color-secondary)]">
+                          <span className="font-medium">Course Progress</span>
+                          <span className="font-mono text-[var(--color-accent)] font-semibold">
+                            {sigmaProg.completed} / 18 completed ({sigmaProg.percentage}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-[var(--color-background)] border border-[var(--color-border)] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[var(--color-accent)] rounded-full transition-all duration-300"
+                            style={{ width: `${sigmaProg.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[var(--color-secondary)]">
+                        <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium">
+                          18 Video Lessons
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium text-emerald-400">
+                          Cross-Lesson AI RAG
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="p-5 space-y-3">
-                    <p className="text-xs text-[var(--color-secondary)] leading-relaxed">
-                      {course.description}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[var(--color-secondary)]">
-                      <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium">
-                        {course.totalLectures} Video Lessons
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium text-emerald-400">
-                        Course AI Synced
-                      </span>
-                    </div>
+                  <div className="p-5 pt-0 border-t border-[var(--color-border)] mt-2 flex items-center justify-between">
+                    <Link
+                      to={`/lectures/${nextSigmaNum}`}
+                      className="btn-accent text-xs font-semibold py-2 px-4 rounded-xl inline-flex items-center gap-2 no-underline"
+                    >
+                      <Play size={14} className="fill-white" />
+                      {sigmaProg.completed > 0 ? `Resume (Lesson ${nextSigmaNum})` : 'Start Course'}
+                    </Link>
+                    <button
+                      onClick={() => setActiveTab('course')}
+                      className="text-xs font-semibold text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors cursor-pointer"
+                    >
+                      View 18 Lessons →
+                    </button>
                   </div>
                 </div>
+              );
+            })()}
 
-                <div className="p-5 pt-0 border-t border-[var(--color-border)] mt-2 flex items-center justify-between">
-                  <Link
-                    to={course.lectures[0] ? `/lectures/${course.lectures[0].number}` : '/lectures'}
-                    className="btn-accent text-xs font-semibold py-2 px-4 rounded-xl inline-flex items-center gap-2 no-underline"
-                  >
-                    <Play size={14} className="fill-white" /> Continue Course
-                  </Link>
-                  <button
-                    onClick={() => handleDeleteCourse(course.id, course.title)}
-                    className="text-xs text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
-                    title="Delete course"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+            {/* Custom Imported Courses */}
+            {filteredCourses.map((course) => {
+              const prog = courseStorage.getCourseProgress(course.lectures.map((l) => l.number));
+              const nextLecture = course.lectures.find((l) => !courseStorage.isLessonCompleted(l.number)) || course.lectures[0];
+              const nextPath = nextLecture ? `/lectures/${nextLecture.number}` : '/lectures';
+
+              return (
+                <div
+                  key={course.id}
+                  className="card overflow-hidden border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all shadow-sm hover:shadow-md flex flex-col justify-between bg-[var(--color-surface)]"
+                >
+                  <div>
+                    <div className="relative aspect-video w-full overflow-hidden bg-zinc-900">
+                      {course.thumbnailUrl ? (
+                        <img
+                          src={course.thumbnailUrl}
+                          alt={course.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center">
+                          <Layers size={32} className="text-[var(--color-accent)]" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
+                      <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[var(--color-accent)] text-white text-[11px] font-bold shadow-md flex items-center gap-1.5">
+                        <ListVideo size={12} /> Imported Playlist
+                      </div>
+                      <div className="absolute bottom-3 left-3 right-3 text-white">
+                        <span className="text-xs font-medium text-emerald-300 block mb-0.5">{course.instructor}</span>
+                        <h3 className="text-base font-bold leading-snug truncate">{course.title}</h3>
+                      </div>
+                    </div>
+
+                    <div className="p-5 space-y-3">
+                      <p className="text-xs text-[var(--color-secondary)] leading-relaxed">
+                        {course.description}
+                      </p>
+
+                      {/* Course Progress Bar */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-[var(--color-secondary)]">
+                          <span className="font-medium">Course Progress</span>
+                          <span className="font-mono text-[var(--color-accent)] font-semibold">
+                            {prog.completed} / {course.totalLectures} completed ({prog.percentage}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-[var(--color-background)] border border-[var(--color-border)] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[var(--color-accent)] rounded-full transition-all duration-300"
+                            style={{ width: `${prog.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[var(--color-secondary)]">
+                        <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium">
+                          {course.totalLectures} Video Lessons
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] border border-[var(--color-border)] font-medium text-emerald-400">
+                          Cross-Lesson AI RAG
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 pt-0 border-t border-[var(--color-border)] mt-2 flex items-center justify-between">
+                    <Link
+                      to={nextPath}
+                      className="btn-accent text-xs font-semibold py-2 px-4 rounded-xl inline-flex items-center gap-2 no-underline"
+                    >
+                      <Play size={14} className="fill-white" />
+                      {prog.completed > 0 ? 'Resume Course' : 'Start Course'}
+                    </Link>
+                    <button
+                      onClick={() => handleDeleteCourse(course.id, course.title)}
+                      className="text-xs text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                      title="Delete course"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
 
           {/* Prompt to Import More Playlists */}
           <div className="p-6 rounded-2xl bg-gradient-to-r from-[var(--color-accent)]/10 via-[var(--color-accent)]/5 to-transparent border border-[var(--color-accent)]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
