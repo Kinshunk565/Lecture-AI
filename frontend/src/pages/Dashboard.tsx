@@ -12,6 +12,7 @@ import {
   Code2,
   BrainCircuit,
   Network,
+  Radio,
 } from 'lucide-react';
 
 import { api } from '../services/api';
@@ -133,43 +134,56 @@ export default function Dashboard() {
         <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-secondary)] mb-3">
           Interactive Learning Tools
         </h3>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           <Link
-            to="/lectures/1"
+            to="/lectures/1?tab=podcast"
+            className="card p-4 flex items-center gap-3 border border-purple-500/30 hover:border-purple-500/60 transition-all no-underline group bg-purple-500/[0.03]"
+          >
+            <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-purple-400">
+              <Radio size={16} className="animate-pulse" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-[var(--color-primary)]">AI Podcast</p>
+              <p className="text-[11px] text-[var(--color-secondary)]">3-min audio briefing</p>
+            </div>
+          </Link>
+
+          <Link
+            to="/lectures/1?tab=code"
             className="card p-4 flex items-center gap-3 border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all no-underline group"
           >
             <div className="w-9 h-9 rounded-lg bg-[var(--color-accent-light)] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <Code2 size={16} className="text-[var(--color-accent)]" />
             </div>
             <div>
-              <p className="text-xs font-bold text-[var(--color-primary)]">Code Playground</p>
-              <p className="text-[11px] text-[var(--color-secondary)]">Live HTML/CSS/JS sandbox</p>
+              <p className="text-xs font-bold text-[var(--color-primary)]">Playground</p>
+              <p className="text-[11px] text-[var(--color-secondary)]">Live HTML/CSS/JS</p>
             </div>
           </Link>
 
           <Link
-            to="/lectures/1"
+            to="/lectures/1?tab=quiz"
             className="card p-4 flex items-center gap-3 border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all no-underline group"
           >
             <div className="w-9 h-9 rounded-lg bg-[var(--color-accent-light)] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <BrainCircuit size={16} className="text-[var(--color-accent)]" />
             </div>
             <div>
-              <p className="text-xs font-bold text-[var(--color-primary)]">Quizzes & Flashcards</p>
-              <p className="text-[11px] text-[var(--color-secondary)]">Active recall & 3D cards</p>
+              <p className="text-xs font-bold text-[var(--color-primary)]">Quiz & Cards</p>
+              <p className="text-[11px] text-[var(--color-secondary)]">Active recall tests</p>
             </div>
           </Link>
 
           <Link
-            to="/lectures/1"
+            to="/lectures/1?tab=mindmap"
             className="card p-4 flex items-center gap-3 border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 transition-all no-underline group"
           >
             <div className="w-9 h-9 rounded-lg bg-[var(--color-accent-light)] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <Network size={16} className="text-[var(--color-accent)]" />
             </div>
             <div>
-              <p className="text-xs font-bold text-[var(--color-primary)]">Concept Mind-Map</p>
-              <p className="text-[11px] text-[var(--color-secondary)]">Timestamp-linked topics</p>
+              <p className="text-xs font-bold text-[var(--color-primary)]">Mind Map</p>
+              <p className="text-[11px] text-[var(--color-secondary)]">Concept network</p>
             </div>
           </Link>
 
@@ -182,7 +196,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-xs font-bold text-[var(--color-primary)]">Semantic Search</p>
-              <p className="text-[11px] text-[var(--color-secondary)]">BGE-M3 cross-lecture RAG</p>
+              <p className="text-[11px] text-[var(--color-secondary)]">BGE-M3 RAG</p>
             </div>
           </Link>
         </div>

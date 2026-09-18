@@ -18,6 +18,7 @@ import {
   Code2,
   Network,
   PenTool,
+  Radio,
 } from 'lucide-react';
 import { api } from '../services/api';
 import type { Lecture, TranscriptChunk, Source } from '../types';
@@ -29,6 +30,7 @@ import InteractiveQuiz from '../components/InteractiveQuiz';
 import CodePlayground from '../components/CodePlayground';
 import ConceptGraph from '../components/ConceptGraph';
 import LectureNotes from '../components/LectureNotes';
+import AudioPodcastBriefing from '../components/AudioPodcastBriefing';
 import { useHistory } from '../hooks/useHistory';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { formatDuration } from '../utils/formatTime';
@@ -37,7 +39,7 @@ import { customLectureStorage } from '../services/customLectureStorage';
 import { courseStorage } from '../services/courseStorage';
 import { LECTURE_CURRICULUM } from '../data/lectureCurriculum';
 
-type WorkbenchTab = 'ai' | 'quiz' | 'code' | 'mindmap' | 'notes' | 'transcript';
+type WorkbenchTab = 'ai' | 'quiz' | 'code' | 'mindmap' | 'notes' | 'podcast' | 'transcript';
 
 export default function LectureDetail() {
   const { number } = useParams<{ number: string }>();
@@ -56,9 +58,14 @@ export default function LectureDetail() {
   const [isDownloadingCoursePdf, setIsDownloadingCoursePdf] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<WorkbenchTab>(
-    searchParams.get('ask') === 'true' ? 'ai' : 'ai'
-  );
+  const [activeTab, setActiveTab] = useState<WorkbenchTab>(() => {
+    if (searchParams.get('ask') === 'true') return 'ai';
+    const tabParam = searchParams.get('tab') as WorkbenchTab;
+    if (['ai', 'quiz', 'code', 'mindmap', 'notes', 'podcast', 'transcript'].includes(tabParam)) {
+      return tabParam;
+    }
+    return 'ai';
+  });
 
   const { addToHistory } = useHistory();
   const { addBookmark, isBookmarked } = useBookmarks();
@@ -287,6 +294,20 @@ export default function LectureDetail() {
               </button>
             )}
 
+            {/* Quick 3-Min Podcast Briefing Button */}
+            <button
+              onClick={() => setActiveTab('podcast')}
+              className={`btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 transition-all cursor-pointer shadow-sm ${
+                activeTab === 'podcast'
+                  ? 'border-purple-500/60 text-purple-400 bg-purple-500/10'
+                  : 'hover:border-purple-500/50 hover:text-purple-300'
+              }`}
+              title="Listen to 3-minute conversational audio briefing of this lecture"
+            >
+              <Radio size={13} className="text-purple-400 animate-pulse" />
+              <span>🎙️ 3-Min Podcast</span>
+            </button>
+
             {/* Download Lesson PDF Button */}
             <button
               onClick={handleDownloadPdf}
@@ -492,6 +513,17 @@ export default function LectureDetail() {
               <span>Notes</span>
             </button>
             <button
+              onClick={() => setActiveTab('podcast')}
+              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
+                activeTab === 'podcast'
+                  ? 'text-purple-400 border-purple-500 bg-[var(--color-surface)]'
+                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
+              }`}
+            >
+              <Radio size={13} className={activeTab === 'podcast' ? 'text-purple-400' : ''} />
+              <span>Podcast</span>
+            </button>
+            <button
               onClick={() => setActiveTab('transcript')}
               className={`lg:hidden px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
                 activeTab === 'transcript'
@@ -546,6 +578,14 @@ export default function LectureDetail() {
                 currentTime={currentTime}
                 curriculum={curriculum}
                 onSeek={handleSeek}
+              />
+            )}
+
+            {activeTab === 'podcast' && (
+              <AudioPodcastBriefing
+                lectureNumber={number!}
+                lectureTitle={lecture.title}
+                curriculum={curriculum}
               />
             )}
 
