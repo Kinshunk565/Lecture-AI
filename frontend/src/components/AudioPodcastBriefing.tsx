@@ -28,6 +28,7 @@ interface PodcastChapter {
   id: number;
   title: string;
   duration: string;
+  totalSecs: number;
   icon: typeof BookOpen;
   text: string;
 }
@@ -64,6 +65,7 @@ export default function AudioPodcastBriefing({
         id: 0,
         title: 'Introduction & Core Objective',
         duration: '0:45',
+        totalSecs: 45,
         icon: Sparkles,
         text: `Welcome to your LectureAI audio briefing for Lesson ${lectureNumber}: ${title}. Today, we're cutting through the noise to give you the mental model you need. ${overview} Let's break it down into core principles.`,
       },
@@ -71,6 +73,7 @@ export default function AudioPodcastBriefing({
         id: 1,
         title: 'First-Principles Architectural Theory',
         duration: '1:05',
+        totalSecs: 65,
         icon: BookOpen,
         text: `Let's dive into the core mechanics. ${theoryPoints} Understanding how the browser parses and executes these structures ensures your applications stay fast, accessible, and maintainable.`,
       },
@@ -78,6 +81,7 @@ export default function AudioPodcastBriefing({
         id: 2,
         title: 'Production Code Demonstration',
         duration: '0:40',
+        totalSecs: 40,
         icon: Code2,
         text: `${codeHighlights} Keep your files well-structured, use consistent naming conventions, and verify every visual change across mobile and desktop viewports.`,
       },
@@ -85,6 +89,7 @@ export default function AudioPodcastBriefing({
         id: 3,
         title: 'Gotchas, Traps & Key Takeaways',
         duration: '0:50',
+        totalSecs: 50,
         icon: AlertTriangle,
         text: `${pitfallPoints} That concludes your 3-minute executive briefing for Lesson ${lectureNumber}. Open the sandbox to experiment with your code, or take the active recall quiz to lock this into long-term memory!`,
       },
@@ -102,6 +107,8 @@ export default function AudioPodcastBriefing({
   const [isCopied, setIsCopied] = useState(false);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const currentStartCharRef = useRef<number>(0);
+  const currentCharOffsetRef = useRef<number>(0);
 
   // Initialize and discover available browser voices
   useEffect(() => {
@@ -141,9 +148,9 @@ export default function AudioPodcastBriefing({
     };
   }, []);
 
-  // Speak a specific chapter
+  // Speak a specific chapter, optionally starting from a specific character index
   const speakChapter = useCallback(
-    (index: number) => {
+    (index: number, startChar = 0, overrideRate?: number) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
       window.speechSynthesis.cancel();
@@ -152,33 +159,47 @@ export default function AudioPodcastBriefing({
         setIsPlaying(false);
         setActiveChapterIndex(0);
         setProgressPercent(0);
+        currentStartCharRef.current = 0;
+        currentCharOffsetRef.current = 0;
         return;
       }
 
       const chapter = chapters[index];
       setActiveChapterIndex(index);
-      setProgressPercent(0);
 
-      const utterance = new SpeechSynthesisUtterance(chapter.text);
+      // Clamp startChar to valid bounds
+      const safeStart = Math.max(0, Math.min(chapter.text.length - 1, startChar));
+      currentStartCharRef.current = safeStart;
+      currentCharOffsetRef.current = safeStart;
+
+      const pct = Math.min(100, Math.round((safeStart / chapter.text.length) * 100));
+      setProgressPercent(pct);
+
+      const textToSpeak = chapter.text.slice(safeStart);
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+
       if (voices[selectedVoiceIndex]) {
         utterance.voice = voices[selectedVoiceIndex];
       }
-      utterance.rate = playbackRate;
+      utterance.rate = overrideRate || playbackRate;
       utterance.volume = isMuted ? 0 : 1;
 
       utterance.onboundary = (event) => {
-        if (event.charIndex && chapter.text.length > 0) {
-          const pct = Math.min(100, Math.round((event.charIndex / chapter.text.length) * 100));
-          setProgressPercent(pct);
+        if (typeof event.charIndex === 'number' && chapter.text.length > 0) {
+          const currentPos = currentStartCharRef.current + event.charIndex;
+          currentCharOffsetRef.current = currentPos;
+          const newPct = Math.min(100, Math.round((currentPos / chapter.text.length) * 100));
+          setProgressPercent(newPct);
         }
       };
 
       utterance.onend = () => {
         setProgressPercent(100);
+        currentCharOffsetRef.current = chapter.text.length;
         if (index < chapters.length - 1) {
           setTimeout(() => {
-            speakChapter(index + 1);
-          }, 400);
+            speakChapter(index + 1, 0);
+          }, 350);
         } else {
           setIsPlaying(false);
         }
@@ -205,14 +226,15 @@ export default function AudioPodcastBriefing({
           console.error('Failed to trigger speech synthesis:', err);
           setIsPlaying(false);
         }
-      }, 50);
+      }, 40);
     },
     [chapters, isMuted, playbackRate, selectedVoiceIndex, voices]
   );
 
   const handleTogglePlay = () => {
     if (!isPlaying) {
-      speakChapter(activeChapterIndex);
+      // Resume from current character position if paused mid-chapter
+      speakChapter(activeChapterIndex, currentCharOffsetRef.current);
     } else {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -222,27 +244,58 @@ export default function AudioPodcastBriefing({
   };
 
   const handleRestart = () => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    speakChapter(0);
+    currentCharOffsetRef.current = 0;
+    speakChapter(activeChapterIndex, 0);
   };
 
   const handleSkipNext = () => {
     const nextIdx = Math.min(chapters.length - 1, activeChapterIndex + 1);
-    speakChapter(nextIdx);
+    currentCharOffsetRef.current = 0;
+    speakChapter(nextIdx, 0);
   };
 
   const handleSkipPrev = () => {
     const prevIdx = Math.max(0, activeChapterIndex - 1);
-    speakChapter(prevIdx);
+    currentCharOffsetRef.current = 0;
+    speakChapter(prevIdx, 0);
   };
 
+  // Changing rate resumes smoothly from the exact current character position!
   const handleRateChange = (rate: number) => {
     setPlaybackRate(rate);
     if (isPlaying) {
-      speakChapter(activeChapterIndex);
+      speakChapter(activeChapterIndex, currentCharOffsetRef.current, rate);
     }
+  };
+
+  // Seek to percentage on the scrubber bar
+  const seekToPercent = (pct: number) => {
+    const chapter = chapters[activeChapterIndex];
+    const targetChar = Math.round((pct / 100) * chapter.text.length);
+    // Find nearest space/word boundary
+    const spaceIdx = chapter.text.indexOf(' ', targetChar);
+    const cleanChar = spaceIdx !== -1 && spaceIdx - targetChar < 25 ? spaceIdx + 1 : targetChar;
+    const safeChar = Math.max(0, Math.min(chapter.text.length - 1, cleanChar));
+
+    currentCharOffsetRef.current = safeChar;
+    setProgressPercent(pct);
+    if (isPlaying) {
+      speakChapter(activeChapterIndex, safeChar);
+    }
+  };
+
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(100, Math.round((clickX / rect.width) * 100)));
+    seekToPercent(pct);
+  };
+
+  const handleSkipSeconds = (deltaSecs: number) => {
+    const chapter = chapters[activeChapterIndex];
+    const deltaPct = (deltaSecs / chapter.totalSecs) * 100;
+    const newPct = Math.max(0, Math.min(100, Math.round(progressPercent + deltaPct)));
+    seekToPercent(newPct);
   };
 
   const handleCopyScript = () => {
@@ -250,6 +303,13 @@ export default function AudioPodcastBriefing({
     navigator.clipboard.writeText(fullScript);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   // Cleanup audio on component unmount
@@ -270,6 +330,10 @@ export default function AudioPodcastBriefing({
   }
 
   const currentChapter = chapters[activeChapterIndex];
+  const currentSecs = Math.min(
+    currentChapter.totalSecs,
+    Math.round((progressPercent / 100) * currentChapter.totalSecs)
+  );
 
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface)] overflow-y-auto p-4 sm:p-6 space-y-5">
@@ -336,24 +400,38 @@ export default function AudioPodcastBriefing({
           ))}
         </div>
 
-        {/* Timeline Progress Bar */}
-        <div className="space-y-1">
-          <div className="w-full h-1.5 bg-[var(--color-background)] border border-[var(--color-border)] rounded-full overflow-hidden">
+        {/* Interactive Scrubbable Timeline Progress Bar */}
+        <div className="space-y-1.5">
+          <div
+            onClick={handleTimelineClick}
+            className="relative w-full py-2 cursor-pointer group select-none"
+            title="Click or drag to seek in chapter"
+          >
+            <div className="w-full h-2 bg-[var(--color-background)] border border-[var(--color-border)] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-emerald-400 rounded-full transition-all duration-100"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            {/* Scrubber thumb handle indicator */}
             <div
-              className="h-full bg-gradient-to-r from-purple-500 to-emerald-400 rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
+              className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-purple-600 border-2 border-white shadow-md transition-transform group-hover:scale-125 pointer-events-none"
+              style={{ left: `calc(${progressPercent}% - 7px)` }}
             />
           </div>
-          <div className="flex items-center justify-between text-[10px] text-[var(--color-secondary)] font-mono">
-            <span>Progress: {progressPercent}%</span>
-            <span>Chapter {activeChapterIndex + 1}/{chapters.length}</span>
+
+          <div className="flex items-center justify-between text-[11px] text-[var(--color-secondary)] font-mono">
+            <span className="font-semibold text-[var(--color-primary)]">
+              {formatTime(currentSecs)} / {currentChapter.duration}
+            </span>
+            <span>Chapter {activeChapterIndex + 1} of {chapters.length}</span>
           </div>
         </div>
 
         {/* Hero Transport Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          {/* Left: Prev, Play, Next, Restart */}
-          <div className="flex items-center gap-2">
+          {/* Left: Prev, -10s, Play, +10s, Next, Restart */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={handleSkipPrev}
               disabled={activeChapterIndex === 0}
@@ -361,6 +439,15 @@ export default function AudioPodcastBriefing({
               title="Previous Chapter"
             >
               <Rewind size={15} />
+            </button>
+
+            {/* Rewind -10s */}
+            <button
+              onClick={() => handleSkipSeconds(-10)}
+              className="px-2 py-1.5 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:border-purple-500/40 cursor-pointer transition-all text-[10px] font-mono font-bold"
+              title="Rewind 10 seconds"
+            >
+              -10s
             </button>
 
             {/* Primary Action Button */}
@@ -376,6 +463,15 @@ export default function AudioPodcastBriefing({
               )}
             </button>
 
+            {/* Forward +10s */}
+            <button
+              onClick={() => handleSkipSeconds(10)}
+              className="px-2 py-1.5 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:border-purple-500/40 cursor-pointer transition-all text-[10px] font-mono font-bold"
+              title="Forward 10 seconds"
+            >
+              +10s
+            </button>
+
             <button
               onClick={handleSkipNext}
               disabled={activeChapterIndex === chapters.length - 1}
@@ -388,7 +484,7 @@ export default function AudioPodcastBriefing({
             <button
               onClick={handleRestart}
               className="p-2 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] cursor-pointer transition-all"
-              title="Restart from Beginning"
+              title="Restart Chapter"
             >
               <RotateCcw size={15} />
             </button>
