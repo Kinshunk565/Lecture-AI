@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Play,
   Pause,
@@ -13,6 +13,8 @@ import {
   BookOpen,
   Code2,
   AlertTriangle,
+  Copy,
+  Check,
 } from 'lucide-react';
 import type { LectureCurriculum } from '../data/lectureCurriculum';
 
@@ -35,22 +37,27 @@ export default function AudioPodcastBriefing({
   lectureTitle,
   curriculum,
 }: AudioPodcastBriefingProps) {
-  // Generate conversational chapters
+  // Generate structured conversational chapters from curriculum
   const chapters: PodcastChapter[] = useMemo(() => {
     const title = curriculum?.title || lectureTitle || 'this lesson';
-    const overview = curriculum?.overview || 'In this session, we break down foundational web development principles from first principles.';
+    const overview =
+      curriculum?.overview ||
+      'In this session, we break down foundational web development principles from first principles.';
 
-    const theoryPoints = curriculum?.theory && curriculum.theory.length > 0
-      ? curriculum.theory.map((t) => `${t.subheading}. ${t.content}`).join(' ')
-      : 'We explore foundational architecture, Document Object Model rendering, and client-server workflows.';
+    const theoryPoints =
+      curriculum?.theory && curriculum.theory.length > 0
+        ? curriculum.theory.map((t) => `${t.subheading}. ${t.content}`).join(' ')
+        : 'We explore foundational architecture, Document Object Model rendering, and client-server workflows.';
 
-    const codeHighlights = curriculum?.code_samples && curriculum.code_samples.length > 0
-      ? `In the code laboratory, the instructor demonstrates: ${curriculum.code_samples[0].caption}. Always ensure proper semantic nesting so browser rendering engines construct clean DOM trees.`
-      : 'Writing standards-compliant production syntax ensures optimal cross-browser consistency and responsive rendering.';
+    const codeHighlights =
+      curriculum?.code_samples && curriculum.code_samples.length > 0
+        ? `In the code laboratory, the instructor demonstrates: ${curriculum.code_samples[0].caption}. Always ensure proper semantic nesting so browser rendering engines construct clean DOM trees.`
+        : 'Writing standards-compliant production syntax ensures optimal cross-browser consistency and responsive rendering.';
 
-    const pitfallPoints = curriculum?.pitfalls && curriculum.pitfalls.length > 0
-      ? `Watch out for these critical traps: ${curriculum.pitfalls.join('. ')}.`
-      : 'Avoid skipping foundational syntax validation, and always inspect elements using browser developer tools.';
+    const pitfallPoints =
+      curriculum?.pitfalls && curriculum.pitfalls.length > 0
+        ? `Watch out for these critical traps: ${curriculum.pitfalls.join('. ')}.`
+        : 'Avoid skipping foundational syntax validation, and always inspect elements using browser developer tools.';
 
     return [
       {
@@ -86,102 +93,138 @@ export default function AudioPodcastBriefing({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
+  const [progressPercent, setProgressPercent] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceIndex, setSelectedVoiceIndex] = useState<number>(0);
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [isCopied, setIsCopied] = useState(false);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Load available speech synthesis voices
+  // Initialize and discover available browser voices
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setSpeechSupported(false);
       return;
     }
 
-    const updateVoices = () => {
+    const loadVoices = () => {
       const allVoices = window.speechSynthesis.getVoices();
-      // Filter for English voices if possible, or all
+      if (!allVoices || allVoices.length === 0) return;
+
       const engVoices = allVoices.filter((v) => v.lang.startsWith('en'));
       const activeList = engVoices.length > 0 ? engVoices : allVoices;
       setVoices(activeList);
 
-      // Prefer a natural, female, or US/UK voice
       const preferredIdx = activeList.findIndex(
-        (v) => v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel')
+        (v) =>
+          v.name.includes('Natural') ||
+          v.name.includes('Google') ||
+          v.name.includes('Samantha') ||
+          v.name.includes('Daniel') ||
+          v.name.includes('Jenny')
       );
       if (preferredIdx !== -1) {
         setSelectedVoiceIndex(preferredIdx);
       }
     };
 
-    updateVoices();
-    window.speechSynthesis.onvoiceschanged = updateVoices;
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
 
     return () => {
-      if (window.speechSynthesis) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
   }, []);
 
   // Speak a specific chapter
-  const speakChapter = (index: number) => {
-    if (!('speechSynthesis' in window)) return;
+  const speakChapter = useCallback(
+    (index: number) => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
-    window.speechSynthesis.cancel();
+      window.speechSynthesis.cancel();
 
-    if (index >= chapters.length) {
-      setIsPlaying(false);
-      setActiveChapterIndex(0);
-      return;
-    }
-
-    const chapter = chapters[index];
-    setActiveChapterIndex(index);
-
-    const utterance = new SpeechSynthesisUtterance(chapter.text);
-    if (voices[selectedVoiceIndex]) {
-      utterance.voice = voices[selectedVoiceIndex];
-    }
-    utterance.rate = playbackRate;
-    utterance.volume = isMuted ? 0 : 1;
-
-    utterance.onend = () => {
-      // Advance to next chapter automatically
-      if (index < chapters.length - 1) {
-        speakChapter(index + 1);
-      } else {
+      if (index < 0 || index >= chapters.length) {
         setIsPlaying(false);
+        setActiveChapterIndex(0);
+        setProgressPercent(0);
+        return;
       }
-    };
 
-    utterance.onerror = (e) => {
-      // Don't treat cancellation as an error
-      if (e.error !== 'canceled' && e.error !== 'interrupted') {
-        console.error('Speech synthesis error:', e);
+      const chapter = chapters[index];
+      setActiveChapterIndex(index);
+      setProgressPercent(0);
+
+      const utterance = new SpeechSynthesisUtterance(chapter.text);
+      if (voices[selectedVoiceIndex]) {
+        utterance.voice = voices[selectedVoiceIndex];
       }
-      setIsPlaying(false);
-    };
+      utterance.rate = playbackRate;
+      utterance.volume = isMuted ? 0 : 1;
 
-    utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-    setIsPlaying(true);
-  };
+      utterance.onboundary = (event) => {
+        if (event.charIndex && chapter.text.length > 0) {
+          const pct = Math.min(100, Math.round((event.charIndex / chapter.text.length) * 100));
+          setProgressPercent(pct);
+        }
+      };
+
+      utterance.onend = () => {
+        setProgressPercent(100);
+        if (index < chapters.length - 1) {
+          setTimeout(() => {
+            speakChapter(index + 1);
+          }, 400);
+        } else {
+          setIsPlaying(false);
+        }
+      };
+
+      utterance.onerror = (e) => {
+        if (e.error !== 'canceled' && e.error !== 'interrupted') {
+          console.warn('Speech synthesis state:', e);
+        }
+        setIsPlaying(false);
+      };
+
+      utteranceRef.current = utterance;
+
+      // Small tick to ensure browser cancels prior audio cleanly
+      setTimeout(() => {
+        try {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+          window.speechSynthesis.speak(utterance);
+          setIsPlaying(true);
+        } catch (err) {
+          console.error('Failed to trigger speech synthesis:', err);
+          setIsPlaying(false);
+        }
+      }, 50);
+    },
+    [chapters, isMuted, playbackRate, selectedVoiceIndex, voices]
+  );
 
   const handleTogglePlay = () => {
     if (!isPlaying) {
       speakChapter(activeChapterIndex);
     } else {
-      window.speechSynthesis.cancel();
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
       setIsPlaying(false);
     }
   };
 
   const handleRestart = () => {
-    window.speechSynthesis.cancel();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     speakChapter(0);
   };
 
@@ -202,7 +245,14 @@ export default function AudioPodcastBriefing({
     }
   };
 
-  // Stop audio if component unmounts
+  const handleCopyScript = () => {
+    const fullScript = chapters.map((c) => `[${c.title}]\n${c.text}`).join('\n\n');
+    navigator.clipboard.writeText(fullScript);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  // Cleanup audio on component unmount
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -219,71 +269,91 @@ export default function AudioPodcastBriefing({
     );
   }
 
+  const currentChapter = chapters[activeChapterIndex];
+
   return (
-    <div className="flex flex-col h-full bg-[var(--color-surface)] overflow-y-auto select-none p-5 space-y-6">
-      {/* Radio Broadcast Card */}
-      <div className="p-6 rounded-2xl bg-gradient-to-br from-[var(--color-accent)]/20 via-[var(--color-accent)]/10 to-[var(--color-background)] border border-[var(--color-accent)]/30 shadow-md relative overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-[var(--color-accent)] text-white flex items-center justify-center shadow-md">
-              <Radio size={16} />
-            </span>
+    <div className="flex flex-col h-full bg-[var(--color-surface)] overflow-y-auto p-4 sm:p-6 space-y-5">
+      {/* Hero Audio Player Deck (Apple / Spotify Podcasts aesthetic) */}
+      <div className="p-5 rounded-2xl bg-gradient-to-b from-[var(--color-background)] to-[var(--color-surface)] border border-[var(--color-border)] shadow-sm space-y-4">
+        {/* Deck Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+              <Radio size={16} className={isPlaying ? 'animate-pulse' : ''} />
+            </div>
             <div>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-[var(--color-accent)] block">
-                LectureAI Podcast Network
+              <span className="text-[10px] uppercase tracking-wider font-bold text-purple-600 dark:text-purple-400 block">
+                LectureAI Audio Briefing
               </span>
-              <h3 className="text-sm font-bold text-[var(--color-primary)] leading-tight">
-                3-Minute Audio Briefing
+              <h3 className="text-xs font-bold text-[var(--color-primary)]">
+                Lesson {lectureNumber} • 3-Min Podcast
               </h3>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Live Playing Indicator */}
-            {isPlaying && (
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold animate-pulse border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                ON AIR
+            {isPlaying ? (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                PLAYING
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full bg-[var(--color-background)] text-[var(--color-secondary)] text-[10px] font-medium border border-[var(--color-border)] flex items-center gap-1">
+                <Clock size={11} /> ~3:20 total
               </span>
             )}
-            <span className="text-xs font-mono text-[var(--color-secondary)] flex items-center gap-1">
-              <Clock size={12} /> ~3:20
-            </span>
           </div>
         </div>
 
-        {/* Lesson Metadata */}
-        <div className="mb-5">
-          <h2 className="text-base font-bold text-[var(--color-primary)]">
-            Lesson {lectureNumber}: {curriculum?.title || lectureTitle}
-          </h2>
-          <p className="text-xs text-[var(--color-secondary)] mt-1 line-clamp-2">
-            Executive conversational audio recap covering architecture, code patterns, and gotchas.
-          </p>
+        {/* Current Chapter Badge & Title */}
+        <div className="pt-1">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--color-secondary)] mb-1">
+            <span className="font-semibold text-purple-600 dark:text-purple-400">
+              Chapter {activeChapterIndex + 1} of {chapters.length}:
+            </span>
+            <span>{currentChapter.duration}</span>
+          </div>
+          <h4 className="text-sm font-bold text-[var(--color-primary)] line-clamp-1">
+            {currentChapter.title}
+          </h4>
         </div>
 
-        {/* Animated Equalizer Waveform Visualizer */}
-        <div className="flex items-center justify-center gap-1 h-12 my-2 py-1 bg-black/20 rounded-xl px-4 border border-white/5">
-          {[12, 28, 45, 18, 38, 52, 24, 40, 16, 48, 30, 15, 35, 50, 22, 42, 28, 14].map((h, i) => (
+        {/* Live Audio Visualizer Equalizer */}
+        <div className="h-10 bg-[var(--color-background)] rounded-xl border border-[var(--color-border)] flex items-center justify-center gap-1 px-4 overflow-hidden">
+          {[12, 28, 45, 18, 38, 52, 24, 40, 16, 48, 30, 15, 35, 50, 22, 42, 28, 14, 32, 20].map((h, i) => (
             <div
               key={i}
-              className={`w-1.5 rounded-full transition-all duration-200 ${
+              className={`w-1 rounded-full transition-all duration-150 ${
                 isPlaying
-                  ? 'bg-gradient-to-t from-[var(--color-accent)] to-emerald-300'
-                  : 'bg-[var(--color-secondary)] opacity-30'
+                  ? 'bg-gradient-to-t from-purple-500 to-emerald-400'
+                  : 'bg-[var(--color-secondary)]/30'
               }`}
               style={{
-                height: isPlaying ? `${Math.max(8, (h * ((i % 3) + 1.2)) % 44)}px` : '6px',
-                transitionDelay: `${i * 30}ms`,
+                height: isPlaying ? `${Math.max(6, (h * ((i % 4) + 1.2)) % 34)}px` : '5px',
+                transitionDelay: `${(i % 5) * 20}ms`,
               }}
             />
           ))}
         </div>
 
-        {/* Primary Audio Transport Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-4 border-t border-[var(--color-border)]/50">
-          <div className="flex items-center gap-3">
-            {/* Prev Chapter */}
+        {/* Timeline Progress Bar */}
+        <div className="space-y-1">
+          <div className="w-full h-1.5 bg-[var(--color-background)] border border-[var(--color-border)] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-purple-500 to-emerald-400 rounded-full transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-[var(--color-secondary)] font-mono">
+            <span>Progress: {progressPercent}%</span>
+            <span>Chapter {activeChapterIndex + 1}/{chapters.length}</span>
+          </div>
+        </div>
+
+        {/* Hero Transport Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          {/* Left: Prev, Play, Next, Restart */}
+          <div className="flex items-center gap-2">
             <button
               onClick={handleSkipPrev}
               disabled={activeChapterIndex === 0}
@@ -293,15 +363,19 @@ export default function AudioPodcastBriefing({
               <Rewind size={15} />
             </button>
 
-            {/* Play/Pause Button */}
+            {/* Primary Action Button */}
             <button
               onClick={handleTogglePlay}
-              className="w-12 h-12 rounded-2xl bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white flex items-center justify-center shadow-lg hover:scale-105 transition-all cursor-pointer"
+              className="w-12 h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              title={isPlaying ? 'Pause Audio' : 'Play Audio'}
             >
-              {isPlaying ? <Pause size={20} className="fill-white" /> : <Play size={20} className="fill-white ml-0.5" />}
+              {isPlaying ? (
+                <Pause size={20} className="fill-white" />
+              ) : (
+                <Play size={20} className="fill-white ml-0.5" />
+              )}
             </button>
 
-            {/* Next Chapter */}
             <button
               onClick={handleSkipNext}
               disabled={activeChapterIndex === chapters.length - 1}
@@ -311,26 +385,26 @@ export default function AudioPodcastBriefing({
               <FastForward size={15} />
             </button>
 
-            {/* Restart */}
             <button
               onClick={handleRestart}
               className="p-2 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] cursor-pointer transition-all"
-              title="Restart from beginning"
+              title="Restart from Beginning"
             >
               <RotateCcw size={15} />
             </button>
           </div>
 
+          {/* Right: Rate & Mute */}
           <div className="flex items-center gap-2">
-            {/* Speed Selector */}
-            <div className="flex items-center bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl p-1 text-[11px] font-semibold">
+            {/* Speed Multipliers */}
+            <div className="flex items-center bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl p-0.5 text-[11px] font-semibold">
               {[1.0, 1.25, 1.5, 2.0].map((rate) => (
                 <button
                   key={rate}
                   onClick={() => handleRateChange(rate)}
-                  className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
                     playbackRate === rate
-                      ? 'bg-[var(--color-accent)] text-white shadow-sm'
+                      ? 'bg-purple-600 text-white shadow-sm'
                       : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
                   }`}
                 >
@@ -339,7 +413,7 @@ export default function AudioPodcastBriefing({
               ))}
             </div>
 
-            {/* Mute toggle */}
+            {/* Mute */}
             <button
               onClick={() => {
                 const nextMute = !isMuted;
@@ -349,46 +423,53 @@ export default function AudioPodcastBriefing({
                 }
               }}
               className="p-2 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] cursor-pointer"
+              title={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} />}
             </button>
           </div>
         </div>
+
+        {/* Voice Selector Row */}
+        {voices.length > 0 && (
+          <div className="pt-2 border-t border-[var(--color-border)] flex items-center justify-between gap-3 text-xs">
+            <span className="text-[11px] font-semibold text-[var(--color-secondary)] flex items-center gap-1.5 shrink-0">
+              <Sparkles size={13} className="text-purple-500" />
+              AI Voice:
+            </span>
+            <select
+              value={selectedVoiceIndex}
+              onChange={(e) => {
+                const idx = parseInt(e.target.value, 10);
+                setSelectedVoiceIndex(idx);
+                if (isPlaying) speakChapter(activeChapterIndex);
+              }}
+              className="flex-1 max-w-xs px-2.5 py-1 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-[11px] text-[var(--color-primary)] focus:outline-none cursor-pointer truncate"
+            >
+              {voices.map((v, idx) => (
+                <option key={idx} value={idx}>
+                  {v.name} ({v.lang})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* Voice & Speaker Settings */}
-      {voices.length > 0 && (
-        <div className="p-3.5 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] flex items-center justify-between gap-3 text-xs">
-          <span className="font-semibold text-[var(--color-secondary)] flex items-center gap-1.5 shrink-0">
-            <Radio size={13} className="text-[var(--color-accent)]" /> AI Voice Narrator:
-          </span>
-          <select
-            value={selectedVoiceIndex}
-            onChange={(e) => {
-              const idx = parseInt(e.target.value, 10);
-              setSelectedVoiceIndex(idx);
-              if (isPlaying) speakChapter(activeChapterIndex);
-            }}
-            className="flex-1 max-w-xs px-2.5 py-1 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-[11px] text-[var(--color-primary)] focus:outline-none cursor-pointer truncate"
-          >
-            {voices.map((v, idx) => (
-              <option key={idx} value={idx}>
-                {v.name} ({v.lang})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Chapter Breakdown & Live Script */}
+      {/* Interactive Episode Chapters (Click any chapter to listen!) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-secondary)]">
-            Podcast Episode Chapters
+            Episode Chapters (Click to Play)
           </h4>
-          <span className="text-[11px] text-[var(--color-secondary)]">
-            Chapter {activeChapterIndex + 1} of {chapters.length}
-          </span>
+          <button
+            onClick={handleCopyScript}
+            className="text-[11px] font-medium text-[var(--color-secondary)] hover:text-[var(--color-primary)] flex items-center gap-1 transition-colors cursor-pointer"
+            title="Copy full podcast script"
+          >
+            {isCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            <span>{isCopied ? 'Copied' : 'Copy Script'}</span>
+          </button>
         </div>
 
         <div className="space-y-2.5">
@@ -402,34 +483,38 @@ export default function AudioPodcastBriefing({
                 onClick={() => speakChapter(idx)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
                   isCurrent
-                    ? 'bg-[var(--color-background)] border-[var(--color-accent)] shadow-md'
-                    : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:border-[var(--color-accent)]/40 hover:bg-[var(--color-background)]'
+                    ? 'bg-purple-500/5 border-purple-500/60 shadow-sm'
+                    : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:border-[var(--color-border)]/80 hover:bg-[var(--color-background)]'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                         isCurrent
-                          ? 'bg-[var(--color-accent)] text-white'
-                          : 'bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-secondary)]'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-secondary)]'
                       }`}
                     >
                       <Icon size={14} />
                     </div>
-                    <span className="text-xs font-bold text-[var(--color-primary)]">
-                      {idx + 1}. {ch.title}
-                    </span>
+                    <div>
+                      <span className="text-xs font-bold text-[var(--color-primary)] block">
+                        {idx + 1}. {ch.title}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[10px] font-mono text-[var(--color-secondary)]">
                       {ch.duration}
                     </span>
                     {isCurrent && isPlaying ? (
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
                     ) : (
-                      <Play size={11} className="text-[var(--color-secondary)]" />
+                      <div className="w-5 h-5 rounded-full bg-[var(--color-background)] border border-[var(--color-border)] flex items-center justify-center text-[var(--color-secondary)]">
+                        <Play size={10} className="ml-0.5 fill-current" />
+                      </div>
                     )}
                   </div>
                 </div>

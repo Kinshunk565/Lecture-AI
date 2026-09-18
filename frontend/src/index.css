@@ -37,13 +37,6 @@
     background-color: var(--color-accent-light);
     color: var(--color-accent);
   }
-
-  /* Hide default mouse cursor on desktop pointer devices so only custom cursor shows */
-  @media (pointer: fine) {
-    *, *::before, *::after {
-      cursor: none !important;
-    }
-  }
 }
 
 @layer components {

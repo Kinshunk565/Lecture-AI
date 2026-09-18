@@ -7,18 +7,21 @@ import {
   Download,
   Loader2,
   Trash2,
-  Sparkles,
   ListVideo,
   ChevronDown,
   CheckCircle2,
   Circle,
+  Radio,
+  Columns,
+  Maximize2,
+  Minimize2,
+  Tv,
   BookOpen,
   MessageSquare,
   HelpCircle,
   Code2,
   Network,
   PenTool,
-  Radio,
 } from 'lucide-react';
 import { api } from '../services/api';
 import type { Lecture, TranscriptChunk, Source } from '../types';
@@ -38,8 +41,10 @@ import { generateLecturePdfSummary, generateCoursePdfSummary } from '../utils/ge
 import { customLectureStorage } from '../services/customLectureStorage';
 import { courseStorage } from '../services/courseStorage';
 import { LECTURE_CURRICULUM } from '../data/lectureCurriculum';
+import { FALLBACK_LECTURES } from '../data/fallbackLectures';
 
 type WorkbenchTab = 'ai' | 'quiz' | 'code' | 'mindmap' | 'notes' | 'podcast' | 'transcript';
+type StudioMode = 'balanced' | 'focus' | 'theater';
 
 export default function LectureDetail() {
   const { number } = useParams<{ number: string }>();
@@ -58,6 +63,8 @@ export default function LectureDetail() {
   const [isDownloadingCoursePdf, setIsDownloadingCoursePdf] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
+  const [studioMode, setStudioMode] = useState<StudioMode>('balanced');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkbenchTab>(() => {
     if (searchParams.get('ask') === 'true') return 'ai';
     const tabParam = searchParams.get('tab') as WorkbenchTab;
@@ -79,7 +86,6 @@ export default function LectureDetail() {
   const courseData = isCustom && number ? courseStorage.getCourseForLecture(number) : null;
   const isCoreCourse = !isCustom && number && !isNaN(parseInt(number, 10));
   const coreNum = isCoreCourse ? parseInt(number, 10) : 0;
-
 
   useEffect(() => {
     if (number) {
@@ -103,7 +109,15 @@ export default function LectureDetail() {
     ? `Lesson ${courseData.index + 1} of ${courseData.course.totalLectures}`
     : (isCoreCourse ? `Lesson ${coreNum} of 18` : null);
 
-  const playlistLectures = courseData ? courseData.course.lectures : [];
+  const playlistLectures = courseData
+    ? courseData.course.lectures
+    : (isCoreCourse
+        ? FALLBACK_LECTURES.map((l) => ({
+            number: l.number,
+            title: l.title,
+            duration: l.duration,
+          }))
+        : []);
 
   const handleToggleCompleted = useCallback(() => {
     if (!number) return;
@@ -228,377 +242,495 @@ export default function LectureDetail() {
   const videoSrc = lecture.video_file ? api.getVideoUrl(lecture.video_file) : null;
 
   return (
-    <div className="animate-fade-in">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link to="/lectures" className="text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors">
-              <ChevronLeft size={18} />
-            </Link>
-            <div>
-              <h1 className="text-lg font-semibold text-[var(--color-primary)] tracking-tight">
-                {lecture.title}
-              </h1>
-              <div className="flex items-center gap-3 text-xs text-[var(--color-secondary)]">
-                {isCustom ? (
-                  <span className="px-2 py-0.5 rounded-full bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold text-[11px] flex items-center gap-1">
-                    <Sparkles size={11} /> Custom Video
-                  </span>
-                ) : (
-                  <span>Video {lecture.number}</span>
-                )}
-                <span>·</span>
-                <span className="flex items-center gap-1"><FileText size={11} /> {lecture.chunk_count} segments</span>
-                {lecture.duration > 0 && (
-                  <>
-                    <span>·</span>
-                    <span>{formatDuration(lecture.duration)}</span>
-                  </>
-                )}
-              </div>
+    <div className="flex flex-col h-[calc(100vh-56px)] bg-[var(--color-background)] overflow-hidden">
+      {/* Consolidated Studio Top Bar (Single Sleek Bar) */}
+      <header className="h-14 px-3 sm:px-5 border-b border-[var(--color-border)] bg-[var(--color-surface)] flex items-center justify-between gap-3 shrink-0 z-30">
+        {/* Left: Navigation, Title & Playlist Drawer */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Link
+            to="/lectures"
+            className="p-1.5 rounded-lg hover:bg-[var(--color-background)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors shrink-0"
+            title="Back to lectures"
+          >
+            <ChevronLeft size={18} />
+          </Link>
+
+          <span className="px-2 py-0.5 rounded-md bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-mono font-bold text-xs shrink-0">
+            {isCustom ? 'Custom' : `L${lecture.number}`}
+          </span>
+
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-xs sm:text-sm font-bold text-[var(--color-primary)] truncate max-w-[140px] sm:max-w-xs md:max-w-sm" title={lecture.title}>
+              {lecture.title}
+            </h1>
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-secondary)] truncate">
+              <span>{courseProgressText || courseTitle}</span>
+              {lecture.duration > 0 && (
+                <>
+                  <span>·</span>
+                  <span>{formatDuration(lecture.duration)}</span>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            {isCustom && (
+          {/* Playlist Drawer Dropdown */}
+          {playlistLectures.length > 0 && (
+            <div className="relative shrink-0 hidden sm:block">
               <button
-                onClick={handleDeleteCustom}
-                className="btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all cursor-pointer shadow-sm"
-                title="Remove this imported video"
+                onClick={() => setIsPlaylistOpen(!isPlaylistOpen)}
+                className="px-2.5 py-1 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-primary)] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
               >
-                <Trash2 size={13} />
-                <span>Remove</span>
+                <ListVideo size={13} className="text-[var(--color-accent)]" />
+                <span>{playlistLectures.length} Lessons</span>
+                <ChevronDown size={12} className={`transform transition-transform ${isPlaylistOpen ? 'rotate-180' : ''}`} />
               </button>
-            )}
 
-            {/* Download Course Syllabus PDF Button (if part of course) */}
-            {(courseData || isCoreCourse) && (
-              <button
-                onClick={handleDownloadCoursePdf}
-                disabled={isDownloadingCoursePdf}
-                className="btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
-                title="Download full course syllabus & study guide containing all lessons"
-              >
-                {isDownloadingCoursePdf ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin text-[var(--color-accent)]" />
-                    <span>Generating Course PDF...</span>
-                  </>
-                ) : (
-                  <>
-                    <BookOpen size={13} className="text-[var(--color-accent)]" />
-                    <span>Course Syllabus (PDF)</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* Quick 3-Min Podcast Briefing Button */}
-            <button
-              onClick={() => setActiveTab('podcast')}
-              className={`btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 transition-all cursor-pointer shadow-sm ${
-                activeTab === 'podcast'
-                  ? 'border-purple-500/60 text-purple-400 bg-purple-500/10'
-                  : 'hover:border-purple-500/50 hover:text-purple-300'
-              }`}
-              title="Listen to 3-minute conversational audio briefing of this lecture"
-            >
-              <Radio size={13} className="text-purple-400 animate-pulse" />
-              <span>🎙️ 3-Min Podcast</span>
-            </button>
-
-            {/* Download Lesson PDF Button */}
-            <button
-              onClick={handleDownloadPdf}
-              disabled={isDownloadingPdf}
-              className="btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 px-3 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all cursor-pointer shadow-sm"
-              title="Download structured AI study summary PDF of this lecture"
-            >
-              {isDownloadingPdf ? (
-                <>
-                  <Loader2 size={13} className="animate-spin text-[var(--color-accent)]" />
-                  <span>Generating PDF...</span>
-                </>
-              ) : (
-                <>
-                  <Download size={13} className="text-[var(--color-accent)]" />
-                  <span>Lesson Guide (PDF)</span>
-                </>
+              {isPlaylistOpen && (
+                <div className="absolute left-0 top-full mt-1.5 w-72 max-h-80 overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-xl z-50 p-1.5 space-y-1">
+                  <div className="px-2.5 py-1.5 text-[10px] uppercase tracking-wider font-bold text-[var(--color-secondary)] border-b border-[var(--color-border)]">
+                    {courseTitle}
+                  </div>
+                  {playlistLectures.map((item, idx) => {
+                    const isDone = courseStorage.isLessonCompleted(item.number);
+                    const isSelected = item.number === number;
+                    return (
+                      <Link
+                        key={item.number}
+                        to={`/lectures/${item.number}`}
+                        onClick={() => setIsPlaylistOpen(false)}
+                        className={`flex items-center justify-between p-2 rounded-lg text-xs no-underline transition-colors ${
+                          isSelected
+                            ? 'bg-[var(--color-accent)] text-white font-semibold shadow-xs'
+                            : 'text-[var(--color-secondary)] hover:bg-[var(--color-background)] hover:text-[var(--color-primary)]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {isDone ? (
+                            <CheckCircle2 size={13} className={isSelected ? 'text-white' : 'text-emerald-500'} />
+                          ) : (
+                            <Circle size={13} className="opacity-40" />
+                          )}
+                          <span className="truncate">L{idx + 1}: {item.title}</span>
+                        </div>
+                        <span className="text-[10px] font-mono opacity-80 shrink-0 ml-2">{formatDuration(item.duration)}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Course & Playlist Navigation Ribbon */}
-      {(courseProgressText || playlistLectures.length > 0) && (
-        <div className="px-6 py-2.5 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-[var(--color-primary)] flex items-center gap-1.5">
-              <ListVideo size={14} className="text-[var(--color-accent)]" />
-              {courseTitle}
-            </span>
-            {courseProgressText && (
-              <span className="px-2 py-0.5 rounded-md bg-[var(--color-background)] text-[var(--color-secondary)] font-mono text-[11px] border border-[var(--color-border)]">
-                {courseProgressText}
-              </span>
-            )}
-          </div>
+        {/* Center: Studio Workspace View Switcher */}
+        <div className="hidden md:flex items-center p-0.5 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-xs font-semibold">
+          <button
+            onClick={() => setStudioMode('balanced')}
+            className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              studioMode === 'balanced'
+                ? 'bg-[var(--color-surface)] text-[var(--color-primary)] shadow-xs'
+                : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+            }`}
+            title="Side-by-side Video and Learning Tools"
+          >
+            <Columns size={13} />
+            <span>Studio</span>
+          </button>
+          <button
+            onClick={() => setStudioMode('focus')}
+            className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              studioMode === 'focus'
+                ? 'bg-[var(--color-surface)] text-[var(--color-primary)] shadow-xs'
+                : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+            }`}
+            title="Maximize Learning Tools (Full Width Sandbox, Mind Map, Quiz, Podcast)"
+          >
+            <Maximize2 size={13} />
+            <span>Focus Tools</span>
+          </button>
+          <button
+            onClick={() => setStudioMode('theater')}
+            className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              studioMode === 'theater'
+                ? 'bg-[var(--color-surface)] text-[var(--color-primary)] shadow-xs'
+                : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+            }`}
+            title="Theater Mode (Maximize Video Player)"
+          >
+            <Tv size={13} />
+            <span>Theater</span>
+          </button>
+        </div>
 
-          <div className="flex items-center gap-2">
-            {/* Mark Lesson Completed Toggle */}
-            <button
-              onClick={handleToggleCompleted}
-              className={`px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 text-[11px] font-medium cursor-pointer ${
-                isCompleted
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                  : 'bg-[var(--color-background)] border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
-              }`}
-              title="Mark lesson completed"
-            >
-              {isCompleted ? <CheckCircle2 size={13} className="text-emerald-400" /> : <Circle size={13} />}
-              <span>{isCompleted ? 'Completed' : 'Mark Complete'}</span>
-            </button>
+        {/* Right: Actions, Completion, Nav & PDF Export */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Mark Complete */}
+          <button
+            onClick={handleToggleCompleted}
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+              isCompleted
+                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                : 'bg-[var(--color-background)] border-[var(--color-border)] text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
+            }`}
+            title={isCompleted ? 'Marked as completed' : 'Mark lesson as completed'}
+          >
+            <CheckCircle2 size={13} className={isCompleted ? 'text-emerald-500' : ''} />
+            <span className="hidden sm:inline">{isCompleted ? 'Done' : 'Complete'}</span>
+          </button>
 
+          {/* Prev / Next Chevrons */}
+          <div className="flex items-center bg-[var(--color-background)] border border-[var(--color-border)] rounded-lg p-0.5 shadow-xs">
             {prevLecturePath ? (
               <Link
                 to={prevLecturePath}
-                className="px-2.5 py-1 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-all flex items-center gap-1 text-[11px] no-underline"
+                className="p-1 rounded text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface)] transition-all"
+                title="Previous Lesson"
               >
-                <ChevronLeft size={13} />
-                <span>Previous</span>
+                <ChevronLeft size={14} />
               </Link>
             ) : (
-              <span className="px-2.5 py-1 text-[11px] text-[var(--color-secondary)] opacity-40 flex items-center gap-1 cursor-not-allowed">
-                <ChevronLeft size={13} /> Previous
+              <span className="p-1 text-[var(--color-secondary)] opacity-30 cursor-not-allowed">
+                <ChevronLeft size={14} />
               </span>
             )}
-
+            <div className="w-[1px] h-3 bg-[var(--color-border)] my-auto" />
             {nextLecturePath ? (
               <Link
                 to={nextLecturePath}
                 onClick={() => {
                   if (number) courseStorage.markLessonCompleted(number, true);
                 }}
-                className="px-2.5 py-1 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-all flex items-center gap-1 text-[11px] no-underline font-medium"
+                className="p-1 rounded text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface)] transition-all"
+                title="Next Lesson"
               >
-                <span>Next Lesson</span>
-                <ChevronRight size={13} />
+                <ChevronRight size={14} />
               </Link>
             ) : (
-              <span className="px-2.5 py-1 text-[11px] text-[var(--color-secondary)] opacity-40 flex items-center gap-1 cursor-not-allowed">
-                Next <ChevronRight size={13} />
+              <span className="p-1 text-[var(--color-secondary)] opacity-30 cursor-not-allowed">
+                <ChevronRight size={14} />
               </span>
             )}
+          </div>
 
+          {/* PDF Export Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+              disabled={isDownloadingPdf || isDownloadingCoursePdf}
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-primary)] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              title="Download structured AI summary PDFs"
+            >
+              {isDownloadingPdf || isDownloadingCoursePdf ? (
+                <Loader2 size={13} className="animate-spin text-[var(--color-accent)]" />
+              ) : (
+                <Download size={13} className="text-[var(--color-accent)]" />
+              )}
+              <span className="hidden md:inline">Export</span>
+              <ChevronDown size={11} className={`transform transition-transform ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-            {playlistLectures.length > 0 && (
-              <div className="relative">
+            {isExportMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-60 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-xl z-50 p-1.5 space-y-1">
                 <button
-                  onClick={() => setIsPlaylistOpen(!isPlaylistOpen)}
-                  className="px-2.5 py-1 rounded-lg bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    handleDownloadPdf();
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-[var(--color-background)] text-[var(--color-primary)] flex items-center gap-2 cursor-pointer transition-colors"
                 >
-                  <span>Playlist ({playlistLectures.length})</span>
-                  <ChevronDown size={12} className={`transform transition-transform ${isPlaylistOpen ? 'rotate-180' : ''}`} />
+                  <FileText size={14} className="text-[var(--color-accent)]" />
+                  <div>
+                    <span className="font-semibold block">Lesson Summary (PDF)</span>
+                    <span className="text-[10px] text-[var(--color-secondary)]">Notes, code & interview quiz</span>
+                  </div>
                 </button>
 
-                {isPlaylistOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-72 max-h-80 overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-xl z-50 p-1.5 space-y-1">
-                    {playlistLectures.map((item, idx) => (
-                      <Link
-                        key={item.number}
-                        to={`/lectures/${item.number}`}
-                        onClick={() => setIsPlaylistOpen(false)}
-                        className={`block p-2 rounded-lg text-[11px] no-underline transition-colors ${
-                          item.number === number
-                            ? 'bg-[var(--color-accent)] text-white font-medium'
-                            : 'text-[var(--color-secondary)] hover:bg-[var(--color-background)] hover:text-[var(--color-primary)]'
-                        }`}
-                      >
-                        <span className="font-semibold block truncate">Lesson {idx + 1}: {item.title}</span>
-                        <span className="text-[10px] opacity-80 block">{formatDuration(item.duration)}</span>
-                      </Link>
-                    ))}
-                  </div>
+                {(courseData || isCoreCourse) && (
+                  <button
+                    onClick={() => {
+                      setIsExportMenuOpen(false);
+                      handleDownloadCoursePdf();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-[var(--color-background)] text-[var(--color-primary)] flex items-center gap-2 cursor-pointer transition-colors border-t border-[var(--color-border)]/50 pt-2"
+                  >
+                    <BookOpen size={14} className="text-[var(--color-accent)]" />
+                    <div>
+                      <span className="font-semibold block">Full Course Syllabus (PDF)</span>
+                      <span className="text-[10px] text-[var(--color-secondary)]">Complete multi-lesson guide</span>
+                    </div>
+                  </button>
                 )}
               </div>
             )}
           </div>
+
+          {/* Delete custom video */}
+          {isCustom && (
+            <button
+              onClick={handleDeleteCustom}
+              className="p-1.5 rounded-lg text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
+              title="Remove this video"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
-      )}
+      </header>
 
-      {/* Main content */}
-      <div className="flex flex-col lg:flex-row">
-        {/* Left: Video */}
-        <div className="flex-1 lg:max-w-[60%]">
-          <div className="p-4">
-            <VideoPlayer
-              src={videoSrc}
-              onTimeUpdate={handleTimeUpdate}
-              seekTo={seekTo}
-              lectureTitle={lecture.title}
-              lectureNumber={lecture.number}
-            />
-          </div>
+      {/* Studio Workspace Body */}
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row relative">
+        {/* Left Column: Video & Transcript Player Pane */}
+        {studioMode !== 'focus' && (
+          <div
+            className={`flex flex-col h-full overflow-y-auto ${
+              studioMode === 'theater'
+                ? 'w-full bg-black/95 p-4 sm:p-8 flex items-center justify-center'
+                : 'lg:w-[48%] xl:w-[46%] border-r border-[var(--color-border)] bg-[var(--color-background)]'
+            }`}
+          >
+            <div className={studioMode === 'theater' ? 'w-full max-w-5xl space-y-4' : 'p-3 sm:p-4'}>
+              {studioMode === 'theater' && (
+                <div className="flex items-center justify-between text-white">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-mono font-bold">Theater Mode</span>
+                    <span className="text-xs text-white/70">{lecture.title}</span>
+                  </div>
+                  <button
+                    onClick={() => setStudioMode('balanced')}
+                    className="px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5"
+                  >
+                    <Columns size={13} />
+                    <span>Exit Theater</span>
+                  </button>
+                </div>
+              )}
 
-          {/* Transcript (desktop - below video) */}
-          <div className="hidden lg:block border-t border-[var(--color-border)]" style={{ height: '400px' }}>
-            <TranscriptViewer
-              chunks={chunks}
-              currentTime={currentTime}
-              onSeek={handleSeek}
-              highlightedStart={highlightedStart}
-            />
-          </div>
-        </div>
-
-        {/* Right: Multi-Tool Learning Workbench */}
-        <div className="lg:w-[40%] border-l border-[var(--color-border)] flex flex-col bg-[var(--color-surface)]" style={{ height: 'calc(100vh - 73px)' }}>
-          {/* Workbench Tab Bar */}
-          <div className="flex border-b border-[var(--color-border)] bg-[var(--color-background)]/80 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setActiveTab('ai')}
-              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
-                activeTab === 'ai'
-                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
-                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
-              }`}
-            >
-              <MessageSquare size={13} />
-              <span>Ask AI</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('quiz')}
-              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
-                activeTab === 'quiz'
-                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
-                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
-              }`}
-            >
-              <HelpCircle size={13} />
-              <span>Quiz & Cards</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('code')}
-              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
-                activeTab === 'code'
-                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
-                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
-              }`}
-            >
-              <Code2 size={13} />
-              <span>Playground</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('mindmap')}
-              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
-                activeTab === 'mindmap'
-                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
-                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
-              }`}
-            >
-              <Network size={13} />
-              <span>Mind Map</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('notes')}
-              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
-                activeTab === 'notes'
-                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
-                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
-              }`}
-            >
-              <PenTool size={13} />
-              <span>Notes</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('podcast')}
-              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
-                activeTab === 'podcast'
-                  ? 'text-purple-400 border-purple-500 bg-[var(--color-surface)]'
-                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
-              }`}
-            >
-              <Radio size={13} className={activeTab === 'podcast' ? 'text-purple-400' : ''} />
-              <span>Podcast</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('transcript')}
-              className={`lg:hidden px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border-b-2 ${
-                activeTab === 'transcript'
-                  ? 'text-[var(--color-accent)] border-[var(--color-accent)] bg-[var(--color-surface)]'
-                  : 'text-[var(--color-secondary)] border-transparent hover:text-[var(--color-primary)]'
-              }`}
-            >
-              <FileText size={13} />
-              <span>Transcript</span>
-            </button>
-          </div>
-
-          {/* Workbench Tab Contents */}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            {activeTab === 'ai' && (
-              <AIChat
-                lectureNumber={number}
-                onSeek={handleSeek}
-                onAddToHistory={handleAddToHistory}
-                onBookmarkSource={handleBookmarkSource}
-                isSourceBookmarked={(num, start) => isBookmarked(num, start)}
-              />
-            )}
-
-            {activeTab === 'quiz' && (
-              <InteractiveQuiz
-                lectureNumber={number!}
-                curriculum={curriculum}
-                onSeek={handleSeek}
-              />
-            )}
-
-            {activeTab === 'code' && (
-              <CodePlayground
-                lectureNumber={number!}
-                curriculum={curriculum}
-              />
-            )}
-
-            {activeTab === 'mindmap' && (
-              <ConceptGraph
-                lectureNumber={number!}
-                curriculum={curriculum}
-                onSeek={handleSeek}
-              />
-            )}
-
-            {activeTab === 'notes' && (
-              <LectureNotes
-                lectureNumber={number!}
+              <VideoPlayer
+                src={videoSrc}
+                onTimeUpdate={handleTimeUpdate}
+                seekTo={seekTo}
                 lectureTitle={lecture.title}
-                currentTime={currentTime}
-                curriculum={curriculum}
-                onSeek={handleSeek}
+                lectureNumber={lecture.number}
               />
-            )}
+            </div>
 
-            {activeTab === 'podcast' && (
-              <AudioPodcastBriefing
-                lectureNumber={number!}
-                lectureTitle={lecture.title}
-                curriculum={curriculum}
-              />
-            )}
-
-            {activeTab === 'transcript' && (
-              <TranscriptViewer
-                chunks={chunks}
-                currentTime={currentTime}
-                onSeek={handleSeek}
-                highlightedStart={highlightedStart}
-              />
+            {/* Transcript (shown below video in balanced mode on desktop) */}
+            {studioMode === 'balanced' && (
+              <div className="hidden lg:flex flex-1 border-t border-[var(--color-border)] flex-col min-h-[350px]">
+                <TranscriptViewer
+                  chunks={chunks}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                  highlightedStart={highlightedStart}
+                />
+              </div>
             )}
           </div>
-        </div>
+        )}
+
+        {/* Floating Mini Player when in Focus Mode (So user never loses the video) */}
+        {studioMode === 'focus' && (
+          <div className="fixed bottom-4 left-4 lg:left-64 z-40 w-72 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden p-2 space-y-2 animate-slide-up">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-secondary)] flex items-center gap-1">
+                <Tv size={11} className="text-[var(--color-accent)]" /> Video Mini Player
+              </span>
+              <button
+                onClick={() => setStudioMode('balanced')}
+                className="text-[10px] text-[var(--color-accent)] font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Restore side-by-side view"
+              >
+                <span>Restore</span>
+                <Columns size={10} />
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden aspect-video bg-black">
+              <VideoPlayer
+                src={videoSrc}
+                onTimeUpdate={handleTimeUpdate}
+                seekTo={seekTo}
+                lectureTitle={lecture.title}
+                lectureNumber={lecture.number}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Right Column: Multi-Tool Learning Workbench */}
+        {studioMode !== 'theater' && (
+          <div
+            className={`h-full flex flex-col bg-[var(--color-surface)] overflow-hidden ${
+              studioMode === 'focus' ? 'w-full' : 'lg:w-[52%] xl:w-[54%]'
+            }`}
+          >
+            {/* Workbench Segmented Tab Bar */}
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-2 overflow-x-auto no-scrollbar gap-2 shrink-0">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveTab('ai')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'ai'
+                      ? 'bg-[var(--color-accent)] text-white shadow-xs'
+                      : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-background)]'
+                  }`}
+                >
+                  <MessageSquare size={13} />
+                  <span>Ask AI</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('podcast')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'podcast'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-purple-600 dark:text-purple-400 hover:bg-purple-500/10'
+                  }`}
+                >
+                  <Radio size={13} className={activeTab === 'podcast' ? 'animate-pulse' : ''} />
+                  <span>Podcast</span>
+                  <span className={`text-[9px] px-1 py-0.2 rounded font-mono ${activeTab === 'podcast' ? 'bg-purple-700 text-white' : 'bg-purple-500/15 text-purple-600'}`}>
+                    3-min
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('quiz')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'quiz'
+                      ? 'bg-[var(--color-accent)] text-white shadow-xs'
+                      : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-background)]'
+                  }`}
+                >
+                  <HelpCircle size={13} />
+                  <span>Quiz & Cards</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('code')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'code'
+                      ? 'bg-[var(--color-accent)] text-white shadow-xs'
+                      : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-background)]'
+                  }`}
+                >
+                  <Code2 size={13} />
+                  <span>Playground</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('mindmap')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'mindmap'
+                      ? 'bg-[var(--color-accent)] text-white shadow-xs'
+                      : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-background)]'
+                  }`}
+                >
+                  <Network size={13} />
+                  <span>Mind Map</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('notes')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'notes'
+                      ? 'bg-[var(--color-accent)] text-white shadow-xs'
+                      : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-background)]'
+                  }`}
+                >
+                  <PenTool size={13} />
+                  <span>Notes</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('transcript')}
+                  className={`lg:hidden px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'transcript'
+                      ? 'bg-[var(--color-accent)] text-white shadow-xs'
+                      : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-background)]'
+                  }`}
+                >
+                  <FileText size={13} />
+                  <span>Transcript</span>
+                </button>
+              </div>
+
+              {/* Expand / Minimize Workbench Toggle */}
+              <div className="hidden lg:flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setStudioMode(studioMode === 'focus' ? 'balanced' : 'focus')}
+                  className="p-1.5 rounded-lg text-[var(--color-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-background)] transition-colors cursor-pointer"
+                  title={studioMode === 'focus' ? 'Restore side-by-side view' : 'Maximize Workbench'}
+                >
+                  {studioMode === 'focus' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Workbench Tab Contents */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {activeTab === 'ai' && (
+                <AIChat
+                  lectureNumber={number}
+                  onSeek={handleSeek}
+                  onAddToHistory={handleAddToHistory}
+                  onBookmarkSource={handleBookmarkSource}
+                  isSourceBookmarked={(num, start) => isBookmarked(num, start)}
+                />
+              )}
+
+              {activeTab === 'podcast' && (
+                <AudioPodcastBriefing
+                  lectureNumber={number!}
+                  lectureTitle={lecture.title}
+                  curriculum={curriculum}
+                />
+              )}
+
+              {activeTab === 'quiz' && (
+                <InteractiveQuiz
+                  lectureNumber={number!}
+                  curriculum={curriculum}
+                  onSeek={handleSeek}
+                />
+              )}
+
+              {activeTab === 'code' && (
+                <CodePlayground
+                  lectureNumber={number!}
+                  curriculum={curriculum}
+                />
+              )}
+
+              {activeTab === 'mindmap' && (
+                <ConceptGraph
+                  lectureNumber={number!}
+                  curriculum={curriculum}
+                  onSeek={handleSeek}
+                />
+              )}
+
+              {activeTab === 'notes' && (
+                <LectureNotes
+                  lectureNumber={number!}
+                  lectureTitle={lecture.title}
+                  currentTime={currentTime}
+                  curriculum={curriculum}
+                  onSeek={handleSeek}
+                />
+              )}
+
+              {activeTab === 'transcript' && (
+                <TranscriptViewer
+                  chunks={chunks}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                  highlightedStart={highlightedStart}
+                />
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

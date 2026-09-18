@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, RotateCcw, Copy, Check, Terminal, ExternalLink, Code2 } from 'lucide-react';
+import { Play, RotateCcw, Copy, Check, Terminal, ExternalLink, Code2, Columns, Rows } from 'lucide-react';
 import type { LectureCurriculum } from '../data/lectureCurriculum';
 
 interface CodePlaygroundProps {
@@ -61,48 +61,59 @@ export default function CodePlayground({ curriculum }: CodePlaygroundProps) {
 </html>`;
 
   const [code, setCode] = useState(initialCode);
+  const [activePane, setActivePane] = useState<'preview' | 'console'>('preview');
   const [copied, setCopied] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
-  const [activePane, setActivePane] = useState<'preview' | 'console'>('preview');
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [splitLayout, setSplitLayout] = useState<'stacked' | 'sideBySide'>('stacked');
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
+  // Re-initialize code when curriculum updates
+  useEffect(() => {
+    if (curriculum?.code_samples?.[0]?.code) {
+      setCode(curriculum.code_samples[0].code);
+    }
+  }, [curriculum]);
+
+  // Execute and render the code in the sandboxed iframe
   const runCode = () => {
     if (!iframeRef.current) return;
 
-    // Inject console capturing script into user code
-    const consoleCaptureScript = `
+    // Inject console.log interceptor into the code
+    const consoleInterceptor = `
       <script>
-        const originalLog = console.log;
-        console.log = function(...args) {
-          window.parent.postMessage({ type: 'PLAYGROUND_LOG', message: args.join(' ') }, '*');
-          originalLog.apply(console, args);
-        };
+        (function() {
+          const oldLog = console.log;
+          console.log = function(...args) {
+            window.parent.postMessage({ type: 'SANDBOX_CONSOLE', data: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
+            oldLog.apply(console, args);
+          };
+          window.onerror = function(msg, url, line) {
+            window.parent.postMessage({ type: 'SANDBOX_ERROR', data: msg + ' (line ' + line + ')' }, '*');
+          };
+        })();
       </script>
     `;
 
-    const fullHtml = code.includes('<head>')
-      ? code.replace('<head>', `<head>${consoleCaptureScript}`)
-      : `${consoleCaptureScript}${code}`;
-
-    const iframeDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
-    if (iframeDoc) {
-      iframeDoc.open();
-      iframeDoc.write(fullHtml);
-      iframeDoc.close();
-    }
+    const fullDoc = code.replace('<head>', '<head>' + consoleInterceptor);
+    iframeRef.current.srcdoc = fullDoc.includes('<head>') ? fullDoc : consoleInterceptor + code;
   };
 
+  // Run automatically on first mount
   useEffect(() => {
-    runCode();
+    const timer = setTimeout(runCode, 300);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Listen for iframe console logs
+  // Listen to messages from the sandbox iframe
   useEffect(() => {
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data && e.data.type === 'PLAYGROUND_LOG') {
-        setConsoleLogs((prev) => [...prev.slice(-20), `[${new Date().toLocaleTimeString()}] ${e.data.message}`]);
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SANDBOX_CONSOLE') {
+        setConsoleLogs((prev) => [...prev.slice(-40), `[LOG] ${event.data.data}`]);
+      } else if (event.data?.type === 'SANDBOX_ERROR') {
+        setConsoleLogs((prev) => [...prev.slice(-40), `[ERROR] ${event.data.data}`]);
       }
     };
+
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
@@ -116,19 +127,18 @@ export default function CodePlayground({ curriculum }: CodePlaygroundProps) {
   const handleReset = () => {
     setCode(initialCode);
     setConsoleLogs([]);
-    setTimeout(() => runCode(), 50);
+    setTimeout(runCode, 100);
   };
 
-  const loadLessonSample = (sampleCode: string) => {
-    setCode(sampleCode);
-    setConsoleLogs([]);
-    setTimeout(() => runCode(), 50);
+  const loadLessonSample = (snippetCode: string) => {
+    setCode(snippetCode);
+    setTimeout(runCode, 100);
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-surface)]">
+    <div className="flex flex-col h-full bg-[var(--color-surface)] overflow-hidden">
       {/* Top Toolbar */}
-      <div className="flex flex-wrap items-center justify-between p-2.5 border-b border-[var(--color-border)] bg-[var(--color-background)]/50 gap-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between p-2.5 border-b border-[var(--color-border)] bg-[var(--color-background)]/50 gap-2 text-xs shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-[var(--color-primary)] flex items-center gap-1.5">
             <Code2 size={15} className="text-[var(--color-accent)]" />
@@ -154,6 +164,15 @@ export default function CodePlayground({ curriculum }: CodePlaygroundProps) {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* Orientation Toggle */}
+          <button
+            onClick={() => setSplitLayout(splitLayout === 'stacked' ? 'sideBySide' : 'stacked')}
+            className="p-1.5 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-background)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors cursor-pointer"
+            title={splitLayout === 'stacked' ? 'Switch to Side-by-Side view' : 'Switch to Stacked view'}
+          >
+            {splitLayout === 'stacked' ? <Columns size={13} /> : <Rows size={13} />}
+          </button>
+
           <button
             onClick={handleCopy}
             className="p-1.5 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-background)] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors cursor-pointer"
@@ -177,10 +196,10 @@ export default function CodePlayground({ curriculum }: CodePlaygroundProps) {
         </div>
       </div>
 
-      {/* Main Split: Code Editor (Top/Left) + Live Preview (Bottom/Right) */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Main Split: Code Editor + Live Preview */}
+      <div className={`flex-1 flex min-h-0 overflow-hidden ${splitLayout === 'sideBySide' ? 'flex-row' : 'flex-col'}`}>
         {/* Code Editor TextArea */}
-        <div className="flex-1 relative flex flex-col border-b border-[var(--color-border)] bg-zinc-950">
+        <div className={`relative flex flex-col bg-zinc-950 min-h-0 ${splitLayout === 'sideBySide' ? 'flex-1 border-r border-[var(--color-border)]' : 'flex-1 border-b border-[var(--color-border)]'}`}>
           <div className="px-3 py-1 bg-zinc-900 border-b border-zinc-800 text-[10px] text-zinc-400 font-mono flex items-center justify-between">
             <span>INDEX.HTML (HTML · CSS · JAVASCRIPT)</span>
             <span className="text-[9px] text-zinc-500">Live Browser Engine</span>
@@ -195,7 +214,7 @@ export default function CodePlayground({ curriculum }: CodePlaygroundProps) {
         </div>
 
         {/* Output Section: Tabs between Live Preview and Console */}
-        <div className="h-[45%] flex flex-col bg-[var(--color-background)]">
+        <div className={`flex flex-col bg-[var(--color-background)] min-h-0 ${splitLayout === 'sideBySide' ? 'flex-1' : 'h-[45%]'}`}>
           <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-surface)] text-[11px]">
             <div className="flex items-center gap-3">
               <button
